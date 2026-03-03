@@ -12,7 +12,7 @@ G = 9.81                # Przyspieszenie grawitacyjne (m/s^2)
 WHEEL_RADIUS = WHEEL_DIAMETER / 2  # Promień koła (m)
 
 
-def calculate_torque_with_front_rear(turn_radius, velocity):
+def calculate_torque_vectoring(turn_radius, velocity):
     """
     Oblicza momenty napędowe na wewnętrzne i zewnętrzne koło tylnej osi w zakręcie,
     uwzględniając rozkład sił przód-tył oraz siły odśrodkowe, z dodanym warunkiem poślizgu całego pojazdu.
@@ -55,7 +55,7 @@ def calculate_torque_with_front_rear(turn_radius, velocity):
 
 
 
-m_right, m_left, is_safe = calculate_torque_with_front_rear(
+m_right, m_left, is_safe = calculate_torque_vectoring(
     turn_radius=6.5, velocity=5
 )
 
@@ -63,7 +63,8 @@ if not is_safe:
     print("Pojazd wpadł w poślizg! Zmniejsz prędkość.")
 else:
     print(f"Moment na wewnętrzne koło: {m_left:.2f} Nm")
-    print(f"Moment na zewnętrzne koło: {m_right:.2f} Nm " ,m_left+m_right)
+    print(f"Moment na zewnętrzne koło: {m_right:.2f} Nm ")
+    print(f"Suma momentów: {m_left + m_right:.2f} Nm")
 
 
 
