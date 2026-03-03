@@ -17,7 +17,7 @@ double speeds_to_car_speed(double speed_fl, double speed_fr, double speed_rl, do
     const double Rr = turn_radius; // promień środka tylnej osi
 
     // jazda prawie na wprost
-    if (fabs(Rr) < 1e-9) {
+    if (fabs(Rr) > 1e4) {
         return 0.25 * (speed_fl + speed_fr + speed_rl + speed_rr);
     }
 
