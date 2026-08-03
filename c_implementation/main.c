@@ -1,59 +1,56 @@
-#include <math.h>
+#include "torque_vectoring.h"
 
-const int MASS = 700;                 // mass of the car (kg)
-const double H = 0.511;               // height of the center of gravity (m)
-const double XC = -0.04;              // longitudinal offset of the center of gravity (m)
-const double WHEELBASE = 2.75;        // wheelbase (m)                
-const double TRACK_WIDTH = 1.7;       // track width (m)
-const double MU = 0.8;                // tire friction coefficient
-const double WHEEL_DIAMETER = 0.7;    // wheel diameter (m)
-const double G = 9.81;                // gravitational acceleration (m/s^2)
-#define WHEEL_RADIUS (WHEEL_DIAMETER / 2.0) // wheel radius (m)
+#include <stdio.h>
+#include <stdlib.h>
 
-// speed_*: prędkości liniowe kół [m/s]
-// turn_radius: promień toru środka tylnej osi [m]
-double speeds_to_car_speed(double speed_fl, double speed_fr, double speed_rl, double speed_rr, double turn_radius) {
-    const double t2 = TRACK_WIDTH * 0.5;
-    const double Rr = turn_radius; // promień środka tylnej osi
+static void print_usage(const char *program, int command_min, int command_max)
+{
+    fprintf(stderr,
+            "Usage: %s [turn_radius_m speed_mps pedal_%d_to_%d]\n",
+            program, command_min, command_max);
+}
 
-    // jazda prawie na wprost
-    if (fabs(Rr) > 1e4) {
-        return 0.25 * (speed_fl + speed_fr + speed_rl + speed_rr);
+int main(int argc, char **argv)
+{
+    double radius_m = 6.5;
+    double speed_mps = 5.0;
+    const VehicleParameters vehicle = tv_default_vehicle();
+    long pedal_command = vehicle.command_min +
+                         (vehicle.command_max - vehicle.command_min) / 2;
+
+    if (argc == 4) {
+        char *radius_end = NULL;
+        char *speed_end = NULL;
+        char *pedal_end = NULL;
+        radius_m = strtod(argv[1], &radius_end);
+        speed_mps = strtod(argv[2], &speed_end);
+        pedal_command = strtol(argv[3], &pedal_end, 10);
+        if (*argv[1] == '\0' || *radius_end != '\0' ||
+            *argv[2] == '\0' || *speed_end != '\0' ||
+            *argv[3] == '\0' || *pedal_end != '\0' ||
+            pedal_command < vehicle.command_min ||
+            pedal_command > vehicle.command_max) {
+            print_usage(argv[0], vehicle.command_min, vehicle.command_max);
+            return EXIT_FAILURE;
+        }
+    } else if (argc != 1) {
+        print_usage(argv[0], vehicle.command_min, vehicle.command_max);
+        return EXIT_FAILURE;
     }
 
-    // Odległość CoM od tylnej osi (uwzględnia XC)
-    const double x_cg_from_rear = (WHEELBASE * 0.5) + XC;
+    const WheelCommands commands = tv_calculate_rear_commands(
+        &vehicle, radius_m, speed_mps, (int)pedal_command);
 
-    // Promienie toru kół:
-    // tył: bez składowej wzdłużnej (oś tylna jako odniesienie skrętu)
-    const double r_rl = fabs(Rr - t2);
-    const double r_rr = fabs(Rr + t2);
+    if (commands.status == TV_LATERAL_GRIP_EXCEEDED) {
+        puts("Lateral grip exceeded: reduce speed.");
+        return EXIT_SUCCESS;
+    }
+    if (commands.status != TV_OK) {
+        fprintf(stderr, "Calculation failed: %s.\n", tv_status_string(commands.status));
+        return EXIT_FAILURE;
+    }
 
-    // przód: dochodzi wheelbase
-    const double r_fl = hypot(WHEELBASE, Rr - t2);
-    const double r_fr = hypot(WHEELBASE, Rr + t2);
-
-    // Prędkość kątowa pojazdu z każdego koła
-    const double omega_fl = speed_fl / r_fl;
-    const double omega_fr = speed_fr / r_fr;
-    const double omega_rl = speed_rl / r_rl;
-    const double omega_rr = speed_rr / r_rr;
-
-    // Uśrednienie (brak poślizgu -> powinny być bardzo zbliżone)
-    const double omega = 0.25 * (omega_fl + omega_fr + omega_rl + omega_rr);
-
-    // Promień toru CoM względem ICR
-    const double R_cg = hypot(Rr, x_cg_from_rear);
-
-    // Prędkość środka masy
-    return omega * R_cg;
+    printf("Rear left command:  %d\n", commands.rear_left);
+    printf("Rear right command: %d\n", commands.rear_right);
+    return EXIT_SUCCESS;
 }
-
-int radius_and_speed_to_max_torque(int turn_radius, int speed) {
-    return 0;
-}
-
-int steering_angle_to_radius(int steering_angle) {
-    return 0;
-}
-
