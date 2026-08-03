@@ -80,11 +80,11 @@ int main(void)
     assert(custom_limit.status == TV_INVALID_ARGUMENT);
 
     assert(nearly_equal(tv_rack_displacement_to_radius(5.0),
-                        104.313597343, 1e-9));
+                        101.4, 1e-12));
     assert(nearly_equal(tv_rack_displacement_to_radius(12.5),
-                        40.297601113, 1e-9));
+                        40.56, 1e-12));
     assert(nearly_equal(tv_rack_displacement_to_radius(-70.0),
-                        -6.740001942, 1e-9));
+                        -7.242857142857, 1e-12));
     assert(isinf(tv_rack_displacement_to_radius(0.0)));
     assert(isnan(tv_rack_displacement_to_radius(4.0)));
     assert(isnan(tv_rack_displacement_to_radius(71.0)));

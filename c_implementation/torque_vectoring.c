@@ -167,8 +167,7 @@ double tv_rack_displacement_to_radius(double rack_displacement_mm)
     }
 
     const double fitted_radius_m =
-        TV_CONFIG_RACK_RADIUS_A *
-        pow(magnitude_mm, TV_CONFIG_RACK_RADIUS_EXPONENT) / 1000.0;
+        TV_CONFIG_RACK_RADIUS_CONSTANT / magnitude_mm;
     const double corrected_radius_m =
         fitted_radius_m * TV_CONFIG_RADIUS_CORRECTION_SCALE +
         TV_CONFIG_RADIUS_CORRECTION_OFFSET_M;

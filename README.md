@@ -58,8 +58,8 @@ Example output for a left turn:
 
 ```text
 Torque vectoring:   active
-Rear left command:  68
-Rear right command: 188
+Rear left command:  72
+Rear right command: 184
 ```
 
 ## The problem
@@ -76,7 +76,7 @@ Rack displacement `x` is converted using a continuous function fitted to the
 measured curve:
 
 ```text
-R_mm = 554462 · |x_mm|⁻¹·⁰³⁸
+R_m = 507 / |x_mm|
 ```
 
 The sign of `x` selects the turn direction. Input remains limited to `5–70 mm`;

@@ -58,8 +58,8 @@ Przykładowy wynik dla skrętu w lewo:
 
 ```text
 Torque vectoring:   active
-Rear left command:  68
-Rear right command: 188
+Rear left command:  72
+Rear right command: 184
 ```
 
 ## Na czym polega problem
@@ -75,7 +75,7 @@ zadawać identycznej wartości.
 Wychylenie `x` jest przeliczane ciągłą funkcją dopasowaną do pomiarów z wykresu:
 
 ```text
-R_mm = 554462 · |x_mm|⁻¹·⁰³⁸
+R_m = 507 / |x_mm|
 ```
 
 Znak `x` określa kierunek skrętu. Zakres wejściowy pozostaje ograniczony do
