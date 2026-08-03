@@ -19,6 +19,7 @@ typedef struct {
 typedef enum {
     TV_OK = 0,
     TV_LATERAL_GRIP_EXCEEDED,
+    TV_RACK_OUT_OF_RANGE,
     TV_INVALID_ARGUMENT
 } TvStatus;
 
@@ -33,6 +34,7 @@ typedef struct {
 typedef struct {
     int rear_left;
     int rear_right;
+    bool torque_vectoring_active;
     TvStatus status;
 } WheelCommands;
 
@@ -47,6 +49,16 @@ TorqueVectoringResult tv_calculate_max_rear_torque(
 WheelCommands tv_calculate_rear_commands(
     const VehicleParameters *vehicle,
     double turn_radius_m,
+    double vehicle_speed_mps,
+    int pedal_command
+);
+
+double tv_rack_displacement_to_radius(double rack_displacement_mm);
+
+WheelCommands tv_calculate_rear_commands_from_rack(
+    const VehicleParameters *vehicle,
+    bool rack_position_available,
+    double rack_displacement_mm,
     double vehicle_speed_mps,
     int pedal_command
 );

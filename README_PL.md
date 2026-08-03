@@ -4,13 +4,21 @@
 
 Program rozdziela żądanie kierowcy między lewe i prawe koło tylnej osi. Przyjmuje:
 
-- promień skrętu `[m]` — dodatni dla skrętu w lewo, ujemny dla skrętu w prawo,
+- wychylenie maglownicy `[mm]` — dodatnie w lewo, ujemne w prawo,
 - prędkość `[m/s]`,
 - nacisk pedału jako liczbę całkowitą `0–256`.
 
 Zwraca dwie całkowite komendy: dla lewego i prawego tylnego koła. Przepływ jest
-prosty: program odczytuje skręt, prędkość i pedał, oblicza rozkład obciążenia,
-a następnie skaluje żądanie pedału osobno dla obu kół.
+prosty: program zamienia wychylenie maglownicy na promień, oblicza rozkład
+obciążenia, a następnie skaluje żądanie pedału osobno dla obu kół.
+
+Jeżeli pomiaru maglownicy nie ma albo wynosi dokładnie `0 mm`, włącza się
+fallback: oba koła dostają bez przeliczania wartość pedału. Torque vectoring jest
+wtedy wyłączony.
+
+Parametry bazowe pojazdu: masa `850 kg`, wysokość środka ciężkości `0,511 m`,
+przesunięcie środka ciężkości względem środka rozstawu osi `-0,040 m`, rozstaw
+osi `2,750 m`, rozstaw kół `1,700 m` i współczynnik tarcia `0,8`.
 
 ## Konfiguracja zakresu
 
@@ -25,20 +33,33 @@ go w pliku `c_implementation/config.h`:
 Po tej zmianie wejście pedału i oba wyjścia działają w zakresie `0–100`.
 `command_min` oznacza brak żądanego momentu, a `command_max` pełne żądanie.
 Wartości spoza skonfigurowanego zakresu zwracają `TV_INVALID_ARGUMENT`.
+W tym samym pliku znajdują się współczynniki do późniejszej korekcji promienia:
+
+```c
+#define TV_CONFIG_RADIUS_CORRECTION_SCALE 1.0
+#define TV_CONFIG_RADIUS_CORRECTION_OFFSET_M 0.0
+```
 
 ## Uruchomienie
 
 ```sh
 make
-./build/torque-vectoring 6.5 5.0 128
+./build/torque-vectoring 70 5.0 128
 make test
+```
+
+Bez dostępnego pomiaru maglownicy podaje się tylko prędkość i pedał:
+
+```sh
+./build/torque-vectoring 5.0 128
 ```
 
 Przykładowy wynik dla skrętu w lewo:
 
 ```text
-Rear left command:  66
-Rear right command: 190
+Torque vectoring:   active
+Rear left command:  68
+Rear right command: 188
 ```
 
 ## Na czym polega problem
@@ -51,7 +72,27 @@ zadawać identycznej wartości.
 
 ## Obliczenia
 
-Przyspieszenie i siła poprzeczna:
+Wychylenie `x` jest przeliczane ciągłą funkcją dopasowaną do pomiarów z wykresu:
+
+```text
+R_mm = 554462 · |x_mm|⁻¹·⁰³⁸
+```
+
+Znak `x` określa kierunek skrętu. Zakres wejściowy pozostaje ograniczony do
+`5–70 mm`; wartości poza nim zwracają `TV_RACK_OUT_OF_RANGE`. Punkty źródłowe:
+
+| Wychylenie [mm] | Promień [mm] | Wychylenie [mm] | Promień [mm] |
+|---:|---:|---:|---:|
+| 5 | 102525 | 40 | 12167 |
+| 10 | 50341 | 45 | 10819 |
+| 15 | 33411 | 50 | 9660 |
+| 20 | 24958 | 55 | 8687 |
+| 25 | 19851 | 60 | 7858 |
+| 30 | 16454 | 65 | 7120 |
+| 35 | 14014 | 70 | 6492 |
+
+Ta sama funkcja, punkty pomiarowe i przykładowa implementacja algorytmu znajdują
+się w notebooku `old/analiz.ipynb`.
 
 ```text
 a_y = v² / |R|
@@ -87,4 +128,7 @@ podziału momentu.
 - `c_implementation/test_torque_vectoring.c` — testy.
 
 To uproszczony model edukacyjny. Nie uwzględnia m.in. koła tarcia opony,
-dynamiki przejściowej, charakterystyki silników i poślizgu kół.
+dynamiki przejściowej, charakterystyki silników, zmian geometrii przy ugięciu
+zawieszenia ani charakterystyki opony. Przewidywana podsterowność nie jest teraz
+modelowana osobno. Po testach auta funkcję promienia można skorygować przez
+`TV_CONFIG_RADIUS_CORRECTION_SCALE` i `TV_CONFIG_RADIUS_CORRECTION_OFFSET_M`.

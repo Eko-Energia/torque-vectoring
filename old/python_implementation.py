@@ -1,7 +1,7 @@
 import math
 
 # --- Stałe pojazdu ---
-MASS = 700              # Masa pojazdu (kg)
+MASS = 850              # Masa pojazdu (kg)
 H = 0.511               # Wysokość środka ciężkości (m)
 XC = -0.04              # Przesunięcie środka ciężkości wzdłuż osi (m)
 WHEELBASE = 2.75        # Rozstaw osi (m)
@@ -65,7 +65,6 @@ else:
     print(f"Moment na wewnętrzne koło: {m_left:.2f} Nm")
     print(f"Moment na zewnętrzne koło: {m_right:.2f} Nm ")
     print(f"Suma momentów: {m_left + m_right:.2f} Nm")
-
 
 
 

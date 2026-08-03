@@ -15,8 +15,8 @@ int main(void)
     const TorqueVectoringResult reference =
         tv_calculate_max_rear_torque(&vehicle, 6.5, 5.0);
     assert(reference.status == TV_OK);
-    assert(nearly_equal(reference.inner_torque_nm, 240.109005841, 1e-6));
-    assert(nearly_equal(reference.outer_torque_nm, 693.303575977, 1e-6));
+    assert(nearly_equal(reference.inner_torque_nm, 291.560935664, 1e-6));
+    assert(nearly_equal(reference.outer_torque_nm, 841.868627972, 1e-6));
 
     const TorqueVectoringResult opposite_turn =
         tv_calculate_max_rear_torque(&vehicle, -6.5, 5.0);
@@ -78,6 +78,47 @@ int main(void)
     const WheelCommands custom_limit =
         tv_calculate_rear_commands(&custom_range, 6.5, 5.0, 101);
     assert(custom_limit.status == TV_INVALID_ARGUMENT);
+
+    assert(nearly_equal(tv_rack_displacement_to_radius(5.0),
+                        104.313597343, 1e-9));
+    assert(nearly_equal(tv_rack_displacement_to_radius(12.5),
+                        40.297601113, 1e-9));
+    assert(nearly_equal(tv_rack_displacement_to_radius(-70.0),
+                        -6.740001942, 1e-9));
+    assert(isinf(tv_rack_displacement_to_radius(0.0)));
+    assert(isnan(tv_rack_displacement_to_radius(4.0)));
+    assert(isnan(tv_rack_displacement_to_radius(71.0)));
+
+    const WheelCommands rack_left = tv_calculate_rear_commands_from_rack(
+        &vehicle, true, 70.0, 5.0, pedal_midpoint);
+    assert(rack_left.status == TV_OK);
+    assert(rack_left.torque_vectoring_active);
+    assert(rack_left.rear_left < rack_left.rear_right);
+
+    const WheelCommands rack_right = tv_calculate_rear_commands_from_rack(
+        &vehicle, true, -70.0, 5.0, pedal_midpoint);
+    assert(rack_right.status == TV_OK);
+    assert(rack_right.rear_left == rack_left.rear_right);
+    assert(rack_right.rear_right == rack_left.rear_left);
+
+    const WheelCommands missing_rack = tv_calculate_rear_commands_from_rack(
+        &vehicle, false, 0.0, 5.0, pedal_midpoint);
+    assert(missing_rack.status == TV_OK);
+    assert(!missing_rack.torque_vectoring_active);
+    assert(missing_rack.rear_left == pedal_midpoint);
+    assert(missing_rack.rear_right == pedal_midpoint);
+
+    const WheelCommands zero_rack = tv_calculate_rear_commands_from_rack(
+        &vehicle, true, 0.0, 5.0, pedal_midpoint);
+    assert(zero_rack.status == TV_OK);
+    assert(!zero_rack.torque_vectoring_active);
+    assert(zero_rack.rear_left == pedal_midpoint);
+    assert(zero_rack.rear_right == pedal_midpoint);
+
+    const WheelCommands rack_out_of_range =
+        tv_calculate_rear_commands_from_rack(
+            &vehicle, true, 71.0, 5.0, pedal_midpoint);
+    assert(rack_out_of_range.status == TV_RACK_OUT_OF_RANGE);
 
     assert(isinf(tv_steering_angle_to_radius(&vehicle, 0.0)));
     assert(nearly_equal(tv_steering_angle_to_radius(&vehicle, atan(2.75 / 10.0)),
