@@ -5,7 +5,7 @@
 Program rozdziela żądanie kierowcy między lewe i prawe koło tylnej osi. Przyjmuje:
 
 - wychylenie maglownicy `[mm]` — dodatnie w lewo, ujemne w prawo,
-- prędkość `[m/s]`,
+- prędkość jako liczba całkowita `[mm/s]`,
 - nacisk pedału jako liczbę całkowitą `0–256`.
 
 Zwraca dwie całkowite komendy: dla lewego i prawego tylnego koła. Przepływ jest
@@ -36,22 +36,24 @@ Wartości spoza skonfigurowanego zakresu zwracają `TV_INVALID_ARGUMENT`.
 W tym samym pliku znajdują się współczynniki do późniejszej korekcji promienia:
 
 ```c
-#define TV_CONFIG_RADIUS_CORRECTION_SCALE 1.0
-#define TV_CONFIG_RADIUS_CORRECTION_OFFSET_M 0.0
+#define TV_CONFIG_RADIUS_CORRECTION_PERMILLE 1000U
+#define TV_CONFIG_RADIUS_CORRECTION_OFFSET_MM 0
 ```
+
+`1000` oznacza mnożnik `1,000`; np. `980` oznacza `0,980`.
 
 ## Uruchomienie
 
 ```sh
 make
-./build/torque-vectoring 70 5.0 128
+./build/torque-vectoring 70 5000 128
 make test
 ```
 
 Bez dostępnego pomiaru maglownicy podaje się tylko prędkość i pedał:
 
 ```sh
-./build/torque-vectoring 5.0 128
+./build/torque-vectoring 5000 128
 ```
 
 Przykładowy wynik dla skrętu w lewo:
@@ -77,6 +79,8 @@ Wychylenie `x` jest przeliczane ciągłą funkcją dopasowaną do pomiarów z wy
 ```text
 R_m = 507 / |x_mm|
 ```
+
+W implementacji całkowitoliczbowej jest to równoważne `R_mm = 507000 / |x_mm|`.
 
 Znak `x` określa kierunek skrętu. Zakres wejściowy pozostaje ograniczony do
 `5–70 mm`; wartości poza nim zwracają `TV_RACK_OUT_OF_RANGE`. Punkty źródłowe:
@@ -119,6 +123,24 @@ temu wyliczoną proporcję między kołami. Łączne żądanie momentu zostaje w
 zmniejszone, ponieważ ważniejsze jest nieprzekroczenie zakresu i zachowanie
 podziału momentu.
 
+## Implementacja STM32
+
+Ścieżka sterująca nie używa `float`, `double`, `pow()`, `hypot()` ani biblioteki
+`libm`. Wejścia i wyjścia mają typy 32-bitowe, a mnożenia pośrednie są wykonywane
+na 64 bitach, aby uniknąć przepełnienia. Jednostki to `mm`, `mm/s`, `mm/s²` oraz
+promile. Dzielenie jest zaokrąglane do najbliższej liczby całkowitej.
+
+Masa, współczynnik tarcia i promień koła skracają się przy liczeniu proporcji
+momentu. Współczynnik tarcia nadal służy do wykrywania przekroczenia przyczepności.
+Maksymalna akceptowana prędkość jest ustawiona przez
+`TV_CONFIG_MAX_SPEED_MMPS`.
+
+Poprzednia implementacja `double` znajduje się w
+`old/c_implementation_double/`. Porównanie `1 268 784` przypadków nie wykazało
+żadnej różnicy statusu przyczepności. Maksymalna różnica wyjścia wyniosła jedną
+jednostkę komendy, a maksymalny względny błąd promienia `0,00572%`. Szczegóły są
+w `old/c_implementation_double/COMPARISON.md`.
+
 ## Pliki
 
 - `c_implementation/torque_vectoring.h` — typy i publiczne funkcje,
@@ -131,4 +153,4 @@ To uproszczony model edukacyjny. Nie uwzględnia m.in. koła tarcia opony,
 dynamiki przejściowej, charakterystyki silników, zmian geometrii przy ugięciu
 zawieszenia ani charakterystyki opony. Przewidywana podsterowność nie jest teraz
 modelowana osobno. Po testach auta funkcję promienia można skorygować przez
-`TV_CONFIG_RADIUS_CORRECTION_SCALE` i `TV_CONFIG_RADIUS_CORRECTION_OFFSET_M`.
+`TV_CONFIG_RADIUS_CORRECTION_PERMILLE` i `TV_CONFIG_RADIUS_CORRECTION_OFFSET_MM`.

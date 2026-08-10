@@ -2,79 +2,49 @@
 #define TORQUE_VECTORING_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct {
-    double mass_kg;
-    double cg_height_m;
-    double cg_offset_from_midpoint_m;
-    double wheelbase_m;
-    double track_width_m;
-    double friction_coefficient;
-    double wheel_radius_m;
-    double gravity_mps2;
-    int command_min;
-    int command_max;
+    uint16_t mass_kg;
+    uint16_t cg_height_mm;
+    int16_t cg_offset_from_midpoint_mm;
+    uint16_t wheelbase_mm;
+    uint16_t track_width_mm;
+    uint16_t friction_permille;
+    uint16_t gravity_mmps2;
+    int32_t command_min;
+    int32_t command_max;
 } VehicleParameters;
 
 typedef enum {
     TV_OK = 0,
     TV_LATERAL_GRIP_EXCEEDED,
     TV_RACK_OUT_OF_RANGE,
+    TV_SPEED_OUT_OF_RANGE,
     TV_INVALID_ARGUMENT
 } TvStatus;
 
 typedef struct {
-    double inner_torque_nm;
-    double outer_torque_nm;
-    double lateral_acceleration_mps2;
-    double rear_axle_normal_load_n;
-    TvStatus status;
-} TorqueVectoringResult;
-
-typedef struct {
-    int rear_left;
-    int rear_right;
+    int32_t rear_left;
+    int32_t rear_right;
+    uint32_t turn_radius_mm;
+    uint32_t lateral_acceleration_mmps2;
     bool torque_vectoring_active;
     TvStatus status;
 } WheelCommands;
 
 VehicleParameters tv_default_vehicle(void);
 
-TorqueVectoringResult tv_calculate_max_rear_torque(
-    const VehicleParameters *vehicle,
-    double turn_radius_m,
-    double vehicle_speed_mps
-);
+/* Returns the unsigned turn radius. Zero means fallback or invalid input. */
+uint32_t tv_rack_displacement_to_radius_mm(int32_t rack_displacement_mm);
 
-WheelCommands tv_calculate_rear_commands(
-    const VehicleParameters *vehicle,
-    double turn_radius_m,
-    double vehicle_speed_mps,
-    int pedal_command
-);
-
-double tv_rack_displacement_to_radius(double rack_displacement_mm);
-
+/* Integer-only real-time path intended for STM32. */
 WheelCommands tv_calculate_rear_commands_from_rack(
     const VehicleParameters *vehicle,
     bool rack_position_available,
-    double rack_displacement_mm,
-    double vehicle_speed_mps,
-    int pedal_command
-);
-
-double tv_steering_angle_to_radius(
-    const VehicleParameters *vehicle,
-    double steering_angle_rad
-);
-
-double tv_wheel_speeds_to_vehicle_speed(
-    const VehicleParameters *vehicle,
-    double speed_front_left_mps,
-    double speed_front_right_mps,
-    double speed_rear_left_mps,
-    double speed_rear_right_mps,
-    double rear_axle_turn_radius_m
+    int32_t rack_displacement_mm,
+    uint32_t vehicle_speed_mmps,
+    int32_t pedal_command
 );
 
 const char *tv_status_string(TvStatus status);

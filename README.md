@@ -6,7 +6,7 @@ The program distributes the driver's request between the left and right rear
 wheels. Its inputs are:
 
 - steering-rack displacement `[mm]` — positive left and negative right,
-- vehicle speed `[m/s]`,
+- integer vehicle speed `[mm/s]`,
 - integer pedal input in the `0–256` range.
 
 It returns two integer commands: rear-left and rear-right. The flow is simple:
@@ -36,22 +36,24 @@ outside the configured range return `TV_INVALID_ARGUMENT`.
 The same file contains coefficients reserved for radius correction after testing:
 
 ```c
-#define TV_CONFIG_RADIUS_CORRECTION_SCALE 1.0
-#define TV_CONFIG_RADIUS_CORRECTION_OFFSET_M 0.0
+#define TV_CONFIG_RADIUS_CORRECTION_PERMILLE 1000U
+#define TV_CONFIG_RADIUS_CORRECTION_OFFSET_MM 0
 ```
+
+`1000` means a `1.000` multiplier; for example, `980` means `0.980`.
 
 ## Run
 
 ```sh
 make
-./build/torque-vectoring 70 5.0 128
+./build/torque-vectoring 70 5000 128
 make test
 ```
 
 When rack position is unavailable, provide only speed and pedal input:
 
 ```sh
-./build/torque-vectoring 5.0 128
+./build/torque-vectoring 5000 128
 ```
 
 Example output for a left turn:
@@ -78,6 +80,8 @@ measured curve:
 ```text
 R_m = 507 / |x_mm|
 ```
+
+The integer implementation uses the equivalent `R_mm = 507000 / |x_mm|`.
 
 The sign of `x` selects the turn direction. Input remains limited to `5–70 mm`;
 values outside this range return `TV_RACK_OUT_OF_RANGE`. Source measurements:
@@ -119,6 +123,23 @@ scales **both** values by the same factor. This preserves the calculated ratio
 between the wheels. Total requested torque is reduced because keeping the output
 in range while preserving the torque split takes priority.
 
+## STM32 implementation
+
+The real-time control path uses no `float`, `double`, `pow()`, `hypot()`, or
+`libm`. Inputs and outputs use 32-bit types, while intermediate products use
+64-bit integers to prevent overflow. Units are `mm`, `mm/s`, `mm/s²`, and
+permille. Division is rounded to the nearest integer.
+
+Mass, friction coefficient, and wheel radius cancel when calculating the torque
+ratio. Friction is still used to detect the lateral-grip limit. Maximum accepted
+speed is configured with `TV_CONFIG_MAX_SPEED_MMPS`.
+
+The previous `double` implementation is archived in
+`old/c_implementation_double/`. A comparison of `1,268,784` cases found no grip
+status disagreements. Maximum output difference was one command unit, and the
+maximum relative radius error was `0.00572%`. Full results are in
+`old/c_implementation_double/COMPARISON.md`.
+
 ## Files
 
 - `c_implementation/torque_vectoring.h` — types and public functions,
@@ -131,4 +152,4 @@ This is a simplified educational model. It does not include the tyre friction
 circle, transient dynamics, motor characteristics, suspension-geometry changes,
 or a measured tyre model. Expected understeer is not modelled separately at this
 stage. After vehicle testing, radius can be corrected with
-`TV_CONFIG_RADIUS_CORRECTION_SCALE` and `TV_CONFIG_RADIUS_CORRECTION_OFFSET_M`.
+`TV_CONFIG_RADIUS_CORRECTION_PERMILLE` and `TV_CONFIG_RADIUS_CORRECTION_OFFSET_MM`.
