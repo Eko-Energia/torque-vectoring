@@ -51,13 +51,26 @@ static int32_t command_from_offset(
 VehicleParameters tv_default_vehicle(void)
 {
     return (VehicleParameters){
+        /* Measured mass of the complete vehicle [kg]. */
         .mass_kg = 850U,
+
+        /* CG is 511 mm above ground. */
         .cg_height_mm = 511U,
+
+        /* CG is 40 mm ahead of the wheelbase midpoint. */
         .cg_offset_from_midpoint_mm = -40,
+
+        /* Axle spacing and rear track width [mm]. */
         .wheelbase_mm = 2750U,
         .track_width_mm = 1700U,
+
+        /* Tyre-road friction coefficient: 800 / 1000 = 0.8. */
         .friction_permille = 800U,
+
+        /* Standard gravity expressed in integer STM32 units [mm/s^2]. */
         .gravity_mmps2 = 9810U,
+
+        /* Valid pedal input and rear-wheel output range. */
         .command_min = TV_CONFIG_COMMAND_MIN,
         .command_max = TV_CONFIG_COMMAND_MAX,
     };

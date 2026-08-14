@@ -16,8 +16,8 @@
 #define TV_CONFIG_COMMAND_MAX 256
 #endif
 
-/** Smallest calibrated non-zero rack displacement magnitude [mm]. */
-#define TV_CONFIG_RACK_MIN_MM 5U
+/** Smallest supported non-zero rack displacement magnitude [mm]. */
+#define TV_CONFIG_RACK_MIN_MM 1U
 
 /** Largest calibrated rack displacement magnitude [mm]. */
 #define TV_CONFIG_RACK_MAX_MM 70U

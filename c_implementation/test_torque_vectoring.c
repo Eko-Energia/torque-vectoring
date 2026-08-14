@@ -11,12 +11,14 @@ int main(void)
     assert(vehicle.cg_height_mm == 511U);
     assert(vehicle.cg_offset_from_midpoint_mm == -40);
 
+    assert(tv_rack_displacement_to_radius_mm(1) == 507000U);
+    assert(tv_rack_displacement_to_radius_mm(3) == 169000U);
+    assert(tv_rack_displacement_to_radius_mm(4) == 126750U);
     assert(tv_rack_displacement_to_radius_mm(5) == 101400U);
     assert(tv_rack_displacement_to_radius_mm(10) == 50700U);
     assert(tv_rack_displacement_to_radius_mm(70) == 7243U);
     assert(tv_rack_displacement_to_radius_mm(-70) == 7243U);
     assert(tv_rack_displacement_to_radius_mm(0) == 0U);
-    assert(tv_rack_displacement_to_radius_mm(4) == 0U);
     assert(tv_rack_displacement_to_radius_mm(71) == 0U);
     assert(tv_rack_displacement_to_radius_mm(INT32_MIN) == 0U);
 
@@ -62,6 +64,13 @@ int main(void)
     assert(!zero_rack.torque_vectoring_active);
     assert(zero_rack.rear_left == pedal_midpoint);
     assert(zero_rack.rear_right == pedal_midpoint);
+
+    const WheelCommands small_rack = tv_calculate_rear_commands_from_rack(
+        &vehicle, true, 3, 5000U, pedal_midpoint);
+    assert(small_rack.status == TV_OK);
+    assert(small_rack.torque_vectoring_active);
+    assert(small_rack.rear_left == 126);
+    assert(small_rack.rear_right == 130);
 
     const WheelCommands slip = tv_calculate_rear_commands_from_rack(
         &vehicle, true, 70, 8000U, pedal_midpoint);

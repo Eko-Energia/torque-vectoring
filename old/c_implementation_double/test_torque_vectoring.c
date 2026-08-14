@@ -81,12 +81,17 @@ int main(void)
 
     assert(nearly_equal(tv_rack_displacement_to_radius(5.0),
                         101.4, 1e-12));
+    assert(nearly_equal(tv_rack_displacement_to_radius(1.0),
+                        507.0, 1e-12));
+    assert(nearly_equal(tv_rack_displacement_to_radius(3.0),
+                        169.0, 1e-12));
+    assert(nearly_equal(tv_rack_displacement_to_radius(4.0),
+                        126.75, 1e-12));
     assert(nearly_equal(tv_rack_displacement_to_radius(12.5),
                         40.56, 1e-12));
     assert(nearly_equal(tv_rack_displacement_to_radius(-70.0),
                         -7.242857142857, 1e-12));
     assert(isinf(tv_rack_displacement_to_radius(0.0)));
-    assert(isnan(tv_rack_displacement_to_radius(4.0)));
     assert(isnan(tv_rack_displacement_to_radius(71.0)));
 
     const WheelCommands rack_left = tv_calculate_rear_commands_from_rack(

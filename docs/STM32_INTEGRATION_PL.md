@@ -75,13 +75,24 @@ aplikacji.
 
 ## Fallback i błędy
 
-- brak świeżego pomiaru maglownicy (`rack_available == false`) → oba koła dostają
+`rack_mm` jest wartością otrzymaną z czujnika. Algorytm jej nie ustawia ani nie
+modyfikuje przed sprawdzeniem zakresu. `rack_available` informuje, czy odczyt
+czujnika jest aktualny.
+
+- brak świeżego pomiaru (`rack_available == false`) → oba koła dostają wartość
+  pedału,
+- otrzymane wychylenie `0 mm` → poprawna pozycja środkowa; oba koła dostają
   wartość pedału,
-- wychylenie `0 mm` → oba koła dostają wartość pedału,
 - `TV_LATERAL_GRIP_EXCEEDED` lub inny błąd → oba wyjścia w strukturze mają
   `command_min`; aplikacja nie powinna podawać momentu,
-- wartość maglownicy pomiędzy `1–4 mm` nie jest fallbackiem, tylko błędem zakresu;
-  dokładnie `0 mm` ma specjalne znaczenie.
+- otrzymane `±1–70 mm` → funkcja oblicza promień i podział momentu,
+- otrzymana wartość powyżej `±70 mm` → funkcja zwraca
+  `TV_RACK_OUT_OF_RANGE`.
+
+Dla `±1–4 mm` używana jest ekstrapolacja funkcji `R = 507 / |x|`, ponieważ
+punkty pomiarowe zaczynają się od `5 mm`. Nie powoduje to problemu z dzieleniem:
+jedynym niedozwolonym dzielnikiem byłoby `0`, które jest obsługiwane wcześniej
+jako jazda prosto.
 
 ## FPU, math.h i arm_math
 

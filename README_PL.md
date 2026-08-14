@@ -2,7 +2,9 @@
 
 [English](README.md) · **Polski**
 
-Program rozdziela żądanie kierowcy między lewe i prawe koło tylnej osi. Przyjmuje:
+Program rozdziela żądanie kierowcy między lewe i prawe koło tylnej osi. Sterownik
+nie ustawia pozycji maglownicy. Przy każdym wywołaniu **otrzymuje aktualny pomiar
+z czujnika maglownicy** razem z informacją, czy pomiar jest dostępny. Wejścia to:
 
 - wychylenie maglownicy `[mm]` — dodatnie w lewo, ujemne w prawo,
 - prędkość jako liczba całkowita `[mm/s]`,
@@ -12,9 +14,20 @@ Zwraca dwie całkowite komendy: dla lewego i prawego tylnego koła. Przepływ je
 prosty: program zamienia wychylenie maglownicy na promień, oblicza rozkład
 obciążenia, a następnie skaluje żądanie pedału osobno dla obu kół.
 
-Jeżeli pomiaru maglownicy nie ma albo wynosi dokładnie `0 mm`, włącza się
-fallback: oba koła dostają bez przeliczania wartość pedału. Torque vectoring jest
-wtedy wyłączony.
+Pomiar maglownicy jest interpretowany następująco:
+
+| Dane otrzymane z czujnika | Działanie programu |
+|---|---|
+| brak aktualnego pomiaru | oba koła dostają wartość pedału |
+| dokładnie `0 mm` | jazda prosto: oba koła dostają wartość pedału |
+| od `+1` do `+70 mm` | skręt w lewo i aktywny torque vectoring |
+| od `-1` do `-70 mm` | skręt w prawo i aktywny torque vectoring |
+| wartość powyżej `±70 mm` | pomiar poza obsługiwanym zakresem; zwracany jest błąd |
+
+Dokładnie `0 mm` jest osobnym, poprawnym pomiarem oznaczającym pozycję środkową
+maglownicy. Dla `±1–4 mm` program także wykonuje obliczenia. W tym obszarze używa
+ekstrapolacji funkcji `R = 507 / |x|`, ponieważ punkty pomiarowe zaczynają się od
+`5 mm`. Dzięki temu podział momentu zmienia się płynnie w pobliżu jazdy prosto.
 
 Parametry bazowe pojazdu: masa `850 kg`, wysokość środka ciężkości `0,511 m`,
 przesunięcie środka ciężkości względem środka rozstawu osi `-0,040 m`, rozstaw
@@ -86,8 +99,9 @@ R_m = 507 / |x_mm|
 
 W implementacji całkowitoliczbowej jest to równoważne `R_mm = 507000 / |x_mm|`.
 
-Znak `x` określa kierunek skrętu. Zakres wejściowy pozostaje ograniczony do
-`5–70 mm`; wartości poza nim zwracają `TV_RACK_OUT_OF_RANGE`. Punkty źródłowe:
+Znak `x` określa kierunek skrętu. Obsługiwany niezerowy zakres wejściowy to
+`1–70 mm`; wartości większe zwracają `TV_RACK_OUT_OF_RANGE`. Dla `1–4 mm`
+funkcja jest ekstrapolowana. Punkty źródłowe zaczynają się od `5 mm`:
 
 | Wychylenie [mm] | Promień [mm] | Wychylenie [mm] | Promień [mm] |
 |---:|---:|---:|---:|

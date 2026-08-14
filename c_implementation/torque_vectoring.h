@@ -100,8 +100,9 @@ VehicleParameters tv_default_vehicle(void);
  * @return Turn radius [mm], or 0 if the value is zero/outside calibration.
  *
  * Uses the integer form R_mm = 507000 / abs(rack_mm), followed by configured
- * permille/offset correction. The caller must use the input sign to determine
- * left/right direction. A zero result is not a valid finite radius.
+ * permille/offset correction for non-zero displacements from 1 to 70 mm.
+ * The caller must use the input sign to determine left/right direction. A zero
+ * result is not a valid finite radius.
  */
 uint32_t tv_rack_displacement_to_radius_mm(int32_t rack_displacement_mm);
 

@@ -3,7 +3,9 @@
 **English** · [Polski](README_PL.md)
 
 The program distributes the driver's request between the left and right rear
-wheels. Its inputs are:
+wheels. It does not set the steering-rack position. On every call it **receives
+the current steering-rack sensor reading** and information indicating whether
+that reading is available. Its inputs are:
 
 - steering-rack displacement `[mm]` — positive left and negative right,
 - integer vehicle speed `[mm/s]`,
@@ -13,8 +15,20 @@ It returns two integer commands: rear-left and rear-right. The flow is simple:
 convert rack displacement to turn radius, calculate lateral load distribution,
 then scale the pedal request separately for both wheels.
 
-If rack position is unavailable or exactly `0 mm`, fallback mode sends the pedal
-value directly to both wheels. Torque vectoring is disabled in that case.
+The rack sensor input is interpreted as follows:
+
+| Data received from the sensor | Program behaviour |
+|---|---|
+| no current reading | send the pedal value to both wheels |
+| exactly `0 mm` | straight driving: send the pedal value to both wheels |
+| `+1` to `+70 mm` | left turn with active torque vectoring |
+| `-1` to `-70 mm` | right turn with active torque vectoring |
+| beyond `±70 mm` | reading outside the supported range; return an error |
+
+Exactly `0 mm` is a separate, valid reading meaning that the rack is centred.
+Values in the `±1–4 mm` range are also calculated. Because measured calibration
+points begin at `5 mm`, this region uses an extrapolation of `R = 507 / |x|`.
+This keeps the torque split continuous near straight-line driving.
 
 Base vehicle parameters are: mass `850 kg`, centre-of-mass height `0.511 m`,
 longitudinal offset from the wheelbase midpoint `-0.040 m`, wheelbase `2.750 m`,
@@ -87,8 +101,9 @@ R_m = 507 / |x_mm|
 
 The integer implementation uses the equivalent `R_mm = 507000 / |x_mm|`.
 
-The sign of `x` selects the turn direction. Input remains limited to `5–70 mm`;
-values outside this range return `TV_RACK_OUT_OF_RANGE`. Source measurements:
+The sign of `x` selects the turn direction. The supported non-zero input range is
+`1–70 mm`; larger values return `TV_RACK_OUT_OF_RANGE`. The curve is extrapolated
+for `1–4 mm`. Source measurements begin at `5 mm`:
 
 | Displacement [mm] | Radius [mm] | Displacement [mm] | Radius [mm] |
 |---:|---:|---:|---:|

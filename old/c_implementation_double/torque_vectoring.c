@@ -18,14 +18,29 @@ static bool vehicle_is_valid(const VehicleParameters *vehicle)
 VehicleParameters tv_default_vehicle(void)
 {
     return (VehicleParameters){
+        /* Measured mass of the complete vehicle [kg]. */
         .mass_kg = 850.0,
+
+        /* CG is 0.511 m above ground. */
         .cg_height_m = 0.511,
+
+        /* CG is 0.04 m ahead of the wheelbase midpoint. */
         .cg_offset_from_midpoint_m = -0.04,
+
+        /* Axle spacing and rear track width [m]. */
         .wheelbase_m = 2.75,
         .track_width_m = 1.7,
+
+        /* Assumed tyre-road friction coefficient [-]. */
         .friction_coefficient = 0.8,
+
+        /* Effective driven-wheel radius used to convert force to torque [m]. */
         .wheel_radius_m = 0.35,
+
+        /* Standard gravitational acceleration [m/s^2]. */
         .gravity_mps2 = 9.81,
+
+        /* Valid pedal input and rear-wheel output range. */
         .command_min = TV_CONFIG_COMMAND_MIN,
         .command_max = TV_CONFIG_COMMAND_MAX,
     };

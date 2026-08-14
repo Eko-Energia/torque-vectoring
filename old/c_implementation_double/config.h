@@ -10,8 +10,8 @@
 #define TV_CONFIG_COMMAND_MAX 256
 #endif
 
-/* Valid absolute rack displacement covered by the steering calibration. */
-#define TV_CONFIG_RACK_MIN_MM 5.0
+/* Valid non-zero rack displacement; 1-4 mm use the fitted curve extrapolation. */
+#define TV_CONFIG_RACK_MIN_MM 1.0
 #define TV_CONFIG_RACK_MAX_MM 70.0
 
 /* Simplified 1/x fit: radius_m = CONSTANT / |rack_mm|. */
