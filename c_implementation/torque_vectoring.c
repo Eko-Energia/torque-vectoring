@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <stddef.h>
 
+/** @brief Checks physical ranges required by the integer equations. */
 static bool vehicle_is_valid(const VehicleParameters *vehicle)
 {
     if (vehicle == NULL || vehicle->mass_kg == 0U ||
@@ -20,16 +21,19 @@ static bool vehicle_is_valid(const VehicleParameters *vehicle)
     return rear_numerator > 0;
 }
 
+/** @brief Absolute value for int32_t without overflow at INT32_MIN. */
 static uint32_t absolute_i32(int32_t value)
 {
     return value < 0 ? (uint32_t)(-(int64_t)value) : (uint32_t)value;
 }
 
+/** @brief Unsigned division rounded to the nearest integer. */
 static uint64_t divide_rounded_u64(uint64_t numerator, uint64_t denominator)
 {
     return (numerator + denominator / 2U) / denominator;
 }
 
+/** @brief Adds an unsigned offset and clamps it to the configured command range. */
 static int32_t command_from_offset(
     const VehicleParameters *vehicle,
     uint64_t offset)

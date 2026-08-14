@@ -20,6 +20,10 @@ Base vehicle parameters are: mass `850 kg`, centre-of-mass height `0.511 m`,
 longitudinal offset from the wheelbase midpoint `-0.040 m`, wheelbase `2.750 m`,
 track width `1.700 m`, and tyre friction coefficient `0.8`.
 
+<p align="center">
+  <img src="docs/vehicle_geometry.svg" width="900" alt="Perła geometry: wheelbase, track width, and centre-of-mass position">
+</p>
+
 ## Command-range configuration
 
 By default, pedal input and wheel commands share the `0–256` range. Change it in
@@ -133,6 +137,13 @@ permille. Division is rounded to the nearest integer.
 Mass, friction coefficient, and wheel radius cancel when calculating the torque
 ratio. Friction is still used to detect the lateral-grip limit. Maximum accepted
 speed is configured with `TV_CONFIG_MAX_SPEED_MMPS`.
+
+The Polish STM32CubeIDE integration guide, unit table, and control-loop example
+are available in [`docs/STM32_INTEGRATION_PL.md`](docs/STM32_INTEGRATION_PL.md).
+The current path uses neither `math.h` nor `arm_math`; CMSIS-DSP is not required.
+
+Public types and functions include Doxygen comments. Generate HTML documentation
+with `doxygen Doxyfile`.
 
 The previous `double` implementation is archived in
 `old/c_implementation_double/`. A comparison of `1,268,784` cases found no grip

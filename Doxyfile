@@ -1,0 +1,14 @@
+PROJECT_NAME           = "Torque Vectoring"
+OUTPUT_DIRECTORY       = build/doxygen
+INPUT                  = c_implementation docs
+FILE_PATTERNS           = *.h *.c *.md
+RECURSIVE               = YES
+EXTRACT_STATIC          = NO
+JAVADOC_AUTOBRIEF       = YES
+MARKDOWN_SUPPORT        = YES
+GENERATE_HTML           = YES
+GENERATE_LATEX          = NO
+QUIET                   = YES
+WARN_IF_UNDOCUMENTED    = YES
+WARN_AS_ERROR           = FAIL_ON_WARNINGS
+IMAGE_PATH              = docs

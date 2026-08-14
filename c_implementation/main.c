@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/** @brief Prints the desktop demonstration program syntax. */
 static void print_usage(
     const char *program,
     int32_t command_min,
@@ -17,6 +18,10 @@ static void print_usage(
             program, (long)command_min, (long)command_max);
 }
 
+/**
+ * @brief Desktop CLI demonstrating the same integer API used on STM32.
+ * @return EXIT_SUCCESS on a valid calculation, otherwise EXIT_FAILURE.
+ */
 int main(int argc, char **argv)
 {
     long rack_displacement_mm = 0;

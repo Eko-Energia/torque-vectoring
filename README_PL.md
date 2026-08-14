@@ -20,6 +20,10 @@ Parametry bazowe pojazdu: masa `850 kg`, wysokość środka ciężkości `0,511 
 przesunięcie środka ciężkości względem środka rozstawu osi `-0,040 m`, rozstaw
 osi `2,750 m`, rozstaw kół `1,700 m` i współczynnik tarcia `0,8`.
 
+<p align="center">
+  <img src="docs/vehicle_geometry.svg" width="900" alt="Geometria Perły: rozstaw osi i kół oraz położenie środka masy">
+</p>
+
 ## Konfiguracja zakresu
 
 Domyślnie pedał i komendy kół używają tego samego zakresu `0–256`. Zmienia się
@@ -134,6 +138,14 @@ Masa, współczynnik tarcia i promień koła skracają się przy liczeniu propor
 momentu. Współczynnik tarcia nadal służy do wykrywania przekroczenia przyczepności.
 Maksymalna akceptowana prędkość jest ustawiona przez
 `TV_CONFIG_MAX_SPEED_MMPS`.
+
+Kompletna instrukcja dodania plików do STM32CubeIDE, tabela jednostek i przykład
+pętli sterującej znajdują się w
+[`docs/STM32_INTEGRATION_PL.md`](docs/STM32_INTEGRATION_PL.md). Aktualna ścieżka
+nie korzysta z `math.h` ani `arm_math`; CMSIS-DSP nie jest wymagane.
+
+Publiczne typy i funkcje mają komentarze Doxygen. Dokumentację HTML można
+wygenerować poleceniem `doxygen Doxyfile`.
 
 Poprzednia implementacja `double` znajduje się w
 `old/c_implementation_double/`. Porównanie `1 268 784` przypadków nie wykazało

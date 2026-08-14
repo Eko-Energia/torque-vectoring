@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="650" viewBox="0 0 1100 650" role="img" aria-labelledby="title desc">
+  <title id="title">Prosty szkic geometrii pojazdu Perła</title>
+  <desc id="desc">Prostokątny obrys pojazdu, koła, środek masy i podstawowe wymiary.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse">
+      <path d="M0 0 L8 4 L0 8 Z" fill="black"/>
+    </marker>
+    <style>
+      text{font-family:Arial,sans-serif;fill:black}
+      .normal{font-size:17px}.small{font-size:14px}.title{font-size:22px;font-weight:bold}
+      .outline{fill:white;stroke:black;stroke-width:3}
+      .wheel{fill:none;stroke:black;stroke-width:5}
+      .axis{stroke:#777;stroke-width:1.5;stroke-dasharray:6 5}
+      .dim{stroke:black;stroke-width:1.5;marker-start:url(#arrow);marker-end:url(#arrow)}
+      .thin{stroke:black;stroke-width:1.5;fill:none}
+    </style>
+  </defs>
+
+  <rect width="1100" height="650" fill="white"/>
+  <text x="550" y="32" text-anchor="middle" class="title">Geometria Perły</text>
+
+  <!-- WIDOK Z GÓRY -->
+  <text x="340" y="72" text-anchor="middle" class="title">widok z góry</text>
+
+  <!-- prostokąt pojazdu -->
+  <rect x="120" y="120" width="530" height="285" class="outline"/>
+  <text x="385" y="255" text-anchor="middle" class="title">PERŁA</text>
+  <text x="65" y="245" text-anchor="middle" class="normal">PRZÓD</text>
+  <path d="M95 260 L45 260 M45 260 L60 250 M45 260 L60 270" class="thin"/>
+
+  <!-- osie -->
+  <line x1="210" y1="95" x2="210" y2="430" class="axis"/>
+  <line x1="560" y1="95" x2="560" y2="430" class="axis"/>
+
+  <!-- koła -->
+  <ellipse cx="210" cy="120" rx="34" ry="17" class="wheel"/>
+  <ellipse cx="210" cy="405" rx="34" ry="17" class="wheel"/>
+  <ellipse cx="560" cy="120" rx="34" ry="17" class="wheel"/>
+  <ellipse cx="560" cy="405" rx="34" ry="17" class="wheel"/>
+  <text x="210" y="452" text-anchor="middle" class="small">oś przednia</text>
+  <text x="560" y="452" text-anchor="middle" class="small">oś tylna</text>
+
+  <!-- rozstaw osi -->
+  <line x1="210" y1="475" x2="560" y2="475" class="dim"/>
+  <line x1="210" y1="430" x2="210" y2="485" class="thin"/>
+  <line x1="560" y1="430" x2="560" y2="485" class="thin"/>
+  <text x="385" y="505" text-anchor="middle" class="normal">L = 2750 mm (rozstaw osi)</text>
+
+  <!-- rozstaw kół -->
+  <line x1="690" y1="120" x2="690" y2="405" class="dim"/>
+  <line x1="594" y1="120" x2="700" y2="120" class="thin"/>
+  <line x1="594" y1="405" x2="700" y2="405" class="thin"/>
+  <text x="710" y="255" class="normal">t = 1700 mm</text>
+  <text x="710" y="277" class="small">rozstaw kół</text>
+
+  <!-- środek rozstawu osi i CoM -->
+  <line x1="385" y1="120" x2="385" y2="405" class="axis"/>
+  <circle cx="378" cy="262" r="9" fill="red" stroke="black" stroke-width="1.5"/>
+  <path d="M369 262 L285 300" class="thin"/>
+  <text x="280" y="305" text-anchor="end" class="normal">środek masy</text>
+  <text x="280" y="327" text-anchor="end" class="normal">x_c = -40 mm</text>
+  <text x="398" y="145" class="small">środek rozstawu osi</text>
+  <text x="420" y="390" class="small">x dodatni do tyłu →</text>
+
+  <!-- WIDOK Z BOKU -->
+  <text x="885" y="72" text-anchor="middle" class="title">widok z boku</text>
+  <line x1="780" y1="440" x2="1035" y2="440" stroke="black" stroke-width="3"/>
+  <rect x="810" y="250" width="205" height="150" class="outline"/>
+  <circle cx="850" cy="410" r="30" class="outline"/>
+  <circle cx="975" cy="410" r="30" class="outline"/>
+  <circle cx="910" cy="300" r="9" fill="red" stroke="black" stroke-width="1.5"/>
+  <text x="925" y="294" class="normal">środek masy</text>
+
+  <!-- wysokość CoM -->
+  <line x1="775" y1="300" x2="775" y2="440" class="dim"/>
+  <line x1="775" y1="300" x2="910" y2="300" class="thin"/>
+  <line x1="775" y1="440" x2="810" y2="440" class="thin"/>
+  <text x="755" y="370" transform="rotate(-90 755 370)" text-anchor="middle" class="normal">h = 511 mm</text>
+  <text x="905" y="465" text-anchor="middle" class="small">nawierzchnia</text>
+
+  <text x="550" y="585" text-anchor="middle" class="small">Rysunek schematyczny — nie zachowuje skali.</text>
+  <circle cx="425" cy="615" r="7" fill="red" stroke="black"/>
+  <text x="440" y="620" class="small">środek masy (CoM)</text>
+  <line x1="600" y1="615" x2="645" y2="615" class="axis"/>
+  <text x="655" y="620" class="small">linia pomocnicza</text>
+</svg>
