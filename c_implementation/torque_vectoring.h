@@ -32,6 +32,12 @@ typedef struct {
     /** Distance between left and right wheel centres, t [mm]. */
     uint16_t track_width_mm;
 
+    /**
+     * Dynamic wheel radius r [mm]. Used to convert wheel RPM or milliradians
+     * per second to linear speed. The torque split does not use this field.
+     */
+    uint16_t wheel_radius_mm;
+
     /** Tyre friction coefficient [1/1000]; 800 represents 0.8. */
     uint16_t friction_permille;
 
@@ -85,6 +91,36 @@ typedef struct {
 } WheelCommands;
 
 /**
+ * @brief Caller-owned EWMA state for one wheel-speed signal [mm/s].
+ *
+ * Zero-initialize before the first update. The kinematics functions do not
+ * store this state; the caller retains the last filtered sample if a CAN
+ * frame is missing in the current cycle.
+ */
+typedef struct {
+    /** Last filtered linear speed [mm/s]. */
+    uint32_t speed_mmps;
+
+    /** False until the first sample has been accepted. */
+    bool initialized;
+} TvWheelSpeedFilter;
+
+/** @brief Rear-vs-front kinematic comparison used for slip detection. */
+typedef struct {
+    /** Bicycle-model CoM speed from the rear axle [mm/s]. */
+    uint32_t rear_com_velocity_mmps;
+
+    /** Front-axle centre speed projected from rear kinematics [mm/s]. */
+    uint32_t front_projected_mmps;
+
+    /** Average of the two front wheel speeds [mm/s]. */
+    uint32_t front_measured_mmps;
+
+    /** True when the front measurement disagrees with the rear projection. */
+    bool slip_detected;
+} TvSlipCheck;
+
+/**
  * @brief Returns the default parameters of Perła.
  * @return Vehicle parameters in integer STM32 units.
  *
@@ -105,6 +141,112 @@ VehicleParameters tv_default_vehicle(void);
  * result is not a valid finite radius.
  */
 uint32_t tv_rack_displacement_to_radius_mm(int32_t rack_displacement_mm);
+
+/**
+ * @brief Estimates CoM velocity magnitude from rear-left and rear-right speeds.
+ * @param vehicle Pointer to vehicle geometry; must remain valid for the call.
+ * @param rear_left_speed_mmps Rear-left wheel linear speed [mm/s].
+ * @param rear_right_speed_mmps Rear-right wheel linear speed [mm/s].
+ * @return CoM speed [mm/s], or 0 if vehicle is NULL or track width is zero.
+ *
+ * Uses bicycle-model kinematics with the non-steered rear axle:
+ * v_x = (v_RL + v_RR) / 2,
+ * v_y = (v_RR - v_RL) * l_r / t,
+ * v_CoM = sqrt(v_x^2 + v_y^2),
+ * where t is track_width_mm and l_r is the rear-axle-to-CoM distance. Integer
+ * division is rounded to the nearest value. The result is a magnitude, so
+ * swapping the two wheel speeds does not change it.
+ */
+uint32_t tv_com_velocity_from_rear_wheels_mmps(
+    const VehicleParameters *vehicle,
+    uint32_t rear_left_speed_mmps,
+    uint32_t rear_right_speed_mmps
+);
+
+/**
+ * @brief Converts wheel rotation rate in RPM to linear speed.
+ * @param vehicle Pointer to parameters providing wheel_radius_mm.
+ * @param rpm Wheel rotational speed in revolutions per minute.
+ * @return Linear speed [mm/s], or 0 if vehicle is NULL or radius is zero.
+ *
+ * Uses v = RPM * r * π / 30 with π ≈ 355/113 and nearest-integer division.
+ */
+uint32_t tv_wheel_rpm_to_speed_mmps(
+    const VehicleParameters *vehicle,
+    uint32_t rpm
+);
+
+/**
+ * @brief Converts wheel angular speed to linear speed.
+ * @param vehicle Pointer to parameters providing wheel_radius_mm.
+ * @param angular_speed_mradps Angular speed [mrad/s]; 1000 = 1 rad/s.
+ * @return Linear speed [mm/s], or 0 if vehicle is NULL or radius is zero.
+ *
+ * Uses v = ω * r with milliradian scaling: v_mmps = ω_mradps * r_mm / 1000.
+ */
+uint32_t tv_wheel_angular_speed_to_linear_mmps(
+    const VehicleParameters *vehicle,
+    uint32_t angular_speed_mradps
+);
+
+/**
+ * @brief Applies a fixed-point EWMA to one wheel-speed sample.
+ * @param filter Caller-owned filter state; must remain valid for the call.
+ * @param sample_mmps New linear speed reading [mm/s].
+ * @return Filtered speed [mm/s], or 0 if filter is NULL.
+ *
+ * The first sample initialises the state. Later updates use
+ * y = α * x + (1-α) * y_prev with α from TV_CONFIG_EWMA_ALPHA_PERMILLE
+ * (200 = 0.2). If a CAN frame is missing, do not call this function; reuse
+ * filter->speed_mmps.
+ */
+uint32_t tv_filter_wheel_speed_mmps(
+    TvWheelSpeedFilter *filter,
+    uint32_t sample_mmps
+);
+
+/**
+ * @brief Estimates CoM velocity from all four wheel speeds.
+ * @param vehicle Pointer to vehicle geometry; must remain valid for the call.
+ * @param front_left_speed_mmps Front-left wheel linear speed [mm/s].
+ * @param front_right_speed_mmps Front-right wheel linear speed [mm/s].
+ * @param rear_left_speed_mmps Rear-left wheel linear speed [mm/s].
+ * @param rear_right_speed_mmps Rear-right wheel linear speed [mm/s].
+ * @return CoM speed [mm/s], or 0 if vehicle is NULL or track width is zero.
+ *
+ * When the rear-axle yaw rate is at or below TV_CONFIG_STRAIGHT_YAW_MRADPS,
+ * returns the average of all four speeds. Otherwise returns the rear-axle
+ * bicycle-model estimate and ignores the front pair.
+ */
+uint32_t tv_com_velocity_from_wheel_speeds_mmps(
+    const VehicleParameters *vehicle,
+    uint32_t front_left_speed_mmps,
+    uint32_t front_right_speed_mmps,
+    uint32_t rear_left_speed_mmps,
+    uint32_t rear_right_speed_mmps
+);
+
+/**
+ * @brief Compares rear-axle kinematics with measured front-axle speed.
+ * @param vehicle Pointer to vehicle geometry; must remain valid for the call.
+ * @param front_left_speed_mmps Front-left wheel linear speed [mm/s].
+ * @param front_right_speed_mmps Front-right wheel linear speed [mm/s].
+ * @param rear_left_speed_mmps Rear-left wheel linear speed [mm/s].
+ * @param rear_right_speed_mmps Rear-right wheel linear speed [mm/s].
+ * @return Diagnostic speeds and slip_detected. All speeds are 0 if vehicle is
+ *         NULL or track width is zero.
+ *
+ * Projects the front-axle centre speed as hypot(v_x, ω * L) from the rear
+ * wheels and compares it with (v_FL + v_FR) / 2. Disagreement of at least
+ * TV_CONFIG_SLIP_SPEED_PERMILLE of the projected speed flags slip.
+ */
+TvSlipCheck tv_check_wheel_slip(
+    const VehicleParameters *vehicle,
+    uint32_t front_left_speed_mmps,
+    uint32_t front_right_speed_mmps,
+    uint32_t rear_left_speed_mmps,
+    uint32_t rear_right_speed_mmps
+);
 
 /**
  * @brief Calculates rear-left and rear-right commands using integer arithmetic.
