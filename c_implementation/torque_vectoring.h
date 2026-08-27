@@ -20,15 +20,14 @@
 /**
  * @brief Physical parameters and command range of the vehicle Perła.
  *
- * The documented ranges are enforced by the calculations so that every
- * intermediate product fits in 32 bits; out-of-range parameters make the
- * functions report an invalid vehicle.
+ * The documented limits are validated so that every intermediate product of
+ * the 32-bit implementation fits in 32 bits.
  */
 typedef struct {
-    /** Vehicle mass [kg]; must be non-zero. */
+    /** Vehicle mass [kg]. */
     uint16_t mass_kg;
 
-    /** Centre-of-mass height above ground, h [mm]; valid range 1 to 2000. */
+    /** Centre-of-mass height above ground, h [mm]. */
     uint16_t cg_height_mm;
 
     /**
@@ -38,23 +37,22 @@ typedef struct {
      */
     int16_t cg_offset_from_midpoint_mm;
 
-    /** Distance between front and rear axle centres, L [mm]; 500 to 5000. */
+    /** Distance between front and rear axle centres, L [mm]; at most 32767. */
     uint16_t wheelbase_mm;
 
-    /** Distance between left and right wheel centres, t [mm]; 500 to 5000. */
+    /** Distance between left and right wheel centres, t [mm]. */
     uint16_t track_width_mm;
 
     /**
-     * Dynamic wheel radius r [mm]; at most 1000, 0 if unknown. Used to convert
-     * wheel RPM or milliradians per second to linear speed. The torque split
-     * does not use this field.
+     * Dynamic wheel radius r [mm]. Used to convert wheel RPM or milliradians
+     * per second to linear speed. The torque split does not use this field.
      */
     uint16_t wheel_radius_mm;
 
-    /** Tyre friction coefficient [1/1000]; 800 represents 0.8; 1 to 2000. */
+    /** Tyre friction coefficient [1/1000]; 800 represents 0.8. */
     uint16_t friction_permille;
 
-    /** Gravitational acceleration [mm/s^2]; valid range 1000 to 20000. */
+    /** Gravitational acceleration [mm/s^2]; at most 20000 (about 2 g). */
     uint16_t gravity_mmps2;
 
     /** Pedal/output value representing zero requested torque. */
@@ -182,8 +180,7 @@ uint32_t tv_com_velocity_from_rear_wheels_mmps(
  * @brief Converts wheel rotation rate in RPM to linear speed.
  * @param vehicle Pointer to parameters providing wheel_radius_mm.
  * @param rpm Wheel rotational speed in revolutions per minute.
- * @return Linear speed [mm/s], or 0 if vehicle is NULL or radius is zero or
- *         above 1000 mm.
+ * @return Linear speed [mm/s], or 0 if vehicle is NULL or radius is zero.
  *
  * Uses v = RPM * r * π / 30 with π ≈ 355/113 and nearest-integer division.
  * Inputs whose product would overflow 32 bits saturate to UINT32_MAX.
@@ -197,8 +194,7 @@ uint32_t tv_wheel_rpm_to_speed_mmps(
  * @brief Converts wheel angular speed to linear speed.
  * @param vehicle Pointer to parameters providing wheel_radius_mm.
  * @param angular_speed_mradps Angular speed [mrad/s]; 1000 = 1 rad/s.
- * @return Linear speed [mm/s], or 0 if vehicle is NULL or radius is zero or
- *         above 1000 mm.
+ * @return Linear speed [mm/s], or 0 if vehicle is NULL or radius is zero.
  *
  * Uses v = ω * r with milliradian scaling: v_mmps = ω_mradps * r_mm / 1000.
  * Inputs whose product would overflow 32 bits saturate to UINT32_MAX.

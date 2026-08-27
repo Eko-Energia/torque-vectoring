@@ -22,7 +22,10 @@
 /** Largest calibrated rack displacement magnitude [mm]. */
 #define TV_CONFIG_RACK_MAX_MM 70U
 
-/** Constant C [m*mm] in the fitted relation R_m = C / abs(rack_mm). */
+/**
+ * Constant C [m*mm] in the fitted relation R_m = C / abs(rack_mm).
+ * Keep C * 1000 * correction permille below 2^31 (32-bit implementation).
+ */
 #define TV_CONFIG_RACK_RADIUS_CONSTANT_M_MM 507U
 
 /** Radius scale [permille]; 1000 = 1.000, 980 = 0.980. */

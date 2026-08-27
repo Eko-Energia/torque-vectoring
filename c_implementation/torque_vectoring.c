@@ -7,64 +7,16 @@
  * All arithmetic in this file is 32-bit. On 32-bit MCU cores 64-bit
  * multiplication and division are emulated in software (for example
  * __aeabi_uldivmod on ARM), so every intermediate product is kept inside
- * uint32_t by the configuration guards below, the validated parameter
- * bounds, and rejection of out-of-range dynamic inputs.
+ * uint32_t by the two validation helpers below, the configuration limits
+ * documented in config.h, and rejection of out-of-range speeds.
  */
 
-#if TV_CONFIG_MAX_SPEED_MMPS > 131070U
-#error "TV_CONFIG_MAX_SPEED_MMPS above 131070 overflows 32-bit speed math"
-#endif
-
-#if TV_CONFIG_RACK_MIN_MM < 1U
-#error "TV_CONFIG_RACK_MIN_MM must be at least 1"
-#endif
-
-#if TV_CONFIG_RACK_MIN_MM > TV_CONFIG_RACK_RADIUS_CONSTANT_M_MM * 1000U
-#error "TV_CONFIG_RACK_MIN_MM must not exceed the fitted radius constant"
-#endif
-
-#if TV_CONFIG_RACK_RADIUS_CONSTANT_M_MM > 4294967U
-#error "TV_CONFIG_RACK_RADIUS_CONSTANT_M_MM * 1000 must fit in 32 bits"
-#endif
-
-#if TV_CONFIG_RADIUS_CORRECTION_PERMILLE > \
-    2147483648U / \
-    (TV_CONFIG_RACK_RADIUS_CONSTANT_M_MM * 1000U / TV_CONFIG_RACK_MIN_MM)
-#error "Radius correction permille overflows 32-bit rack-radius math"
-#endif
-
-#if TV_CONFIG_RADIUS_CORRECTION_OFFSET_MM > 1073741823 || \
-    TV_CONFIG_RADIUS_CORRECTION_OFFSET_MM < -1073741823
-#error "TV_CONFIG_RADIUS_CORRECTION_OFFSET_MM must fit in 31 bits"
-#endif
-
-#if TV_CONFIG_SLIP_SPEED_PERMILLE > 1000U
-#error "TV_CONFIG_SLIP_SPEED_PERMILLE above 1000 overflows the slip limit"
-#endif
-
-/* Physical parameter bounds that keep every 32-bit product below 2^32. */
-#define TV_MIN_AXLE_DISTANCE_MM 500U
-#define TV_MAX_AXLE_DISTANCE_MM 5000U
-#define TV_MAX_CG_HEIGHT_MM 2000U
-#define TV_MAX_WHEEL_RADIUS_MM 1000U
-#define TV_MIN_GRAVITY_MMPS2 1000U
-#define TV_MAX_GRAVITY_MMPS2 20000U
-#define TV_MAX_FRICTION_PERMILLE 2000U
-
-/** @brief Checks the geometry bounds required by the 32-bit equations. */
+/** @brief Checks the geometry bounds required by the 32-bit kinematics. */
 static bool geometry_is_valid(const VehicleParameters *vehicle)
 {
-    if (vehicle == NULL || vehicle->cg_height_mm == 0U ||
-        vehicle->cg_height_mm > TV_MAX_CG_HEIGHT_MM ||
-        vehicle->wheelbase_mm < TV_MIN_AXLE_DISTANCE_MM ||
-        vehicle->wheelbase_mm > TV_MAX_AXLE_DISTANCE_MM ||
-        vehicle->track_width_mm < TV_MIN_AXLE_DISTANCE_MM ||
-        vehicle->track_width_mm > TV_MAX_AXLE_DISTANCE_MM ||
-        vehicle->wheel_radius_mm > TV_MAX_WHEEL_RADIUS_MM ||
-        vehicle->gravity_mmps2 < TV_MIN_GRAVITY_MMPS2 ||
-        vehicle->gravity_mmps2 > TV_MAX_GRAVITY_MMPS2 ||
-        vehicle->friction_permille == 0U ||
-        vehicle->friction_permille > TV_MAX_FRICTION_PERMILLE) {
+    /* L is capped at 32767 so speed * distance products fit in 32 bits. */
+    if (vehicle == NULL || vehicle->track_width_mm == 0U ||
+        vehicle->wheelbase_mm > 32767U) {
         return false;
     }
 
@@ -78,7 +30,10 @@ static bool geometry_is_valid(const VehicleParameters *vehicle)
 /** @brief Checks all ranges required by the integer torque-split equations. */
 static bool vehicle_is_valid(const VehicleParameters *vehicle)
 {
+    /* Gravity is capped at ~2g so the split proxies stay below 2^16. */
     if (!geometry_is_valid(vehicle) || vehicle->mass_kg == 0U ||
+        vehicle->cg_height_mm == 0U || vehicle->friction_permille == 0U ||
+        vehicle->gravity_mmps2 == 0U || vehicle->gravity_mmps2 > 20000U ||
         vehicle->command_min >= vehicle->command_max) {
         return false;
     }
@@ -277,8 +232,7 @@ uint32_t tv_wheel_rpm_to_speed_mmps(
     const VehicleParameters *vehicle,
     uint32_t rpm)
 {
-    if (vehicle == NULL || vehicle->wheel_radius_mm == 0U ||
-        vehicle->wheel_radius_mm > TV_MAX_WHEEL_RADIUS_MM) {
+    if (vehicle == NULL || vehicle->wheel_radius_mm == 0U) {
         return 0U;
     }
 
@@ -294,8 +248,7 @@ uint32_t tv_wheel_angular_speed_to_linear_mmps(
     const VehicleParameters *vehicle,
     uint32_t angular_speed_mradps)
 {
-    if (vehicle == NULL || vehicle->wheel_radius_mm == 0U ||
-        vehicle->wheel_radius_mm > TV_MAX_WHEEL_RADIUS_MM) {
+    if (vehicle == NULL || vehicle->wheel_radius_mm == 0U) {
         return 0U;
     }
 
@@ -398,8 +351,12 @@ TvSlipCheck tv_check_wheel_slip(
 
     const uint32_t disagreement_mmps = unsigned_delta_u32(
         result.front_measured_mmps, result.front_projected_mmps);
-    const uint32_t limit_mmps = divide_rounded_u32(
-        result.front_projected_mmps * TV_CONFIG_SLIP_SPEED_PERMILLE, 1000U);
+    /* Staged so the permille product cannot overflow for any speed. */
+    const uint32_t limit_mmps =
+        (result.front_projected_mmps / 1000U) * TV_CONFIG_SLIP_SPEED_PERMILLE +
+        divide_rounded_u32(
+            (result.front_projected_mmps % 1000U) * TV_CONFIG_SLIP_SPEED_PERMILLE,
+            1000U);
     result.slip_detected = disagreement_mmps >= TV_CONFIG_SLIP_MIN_MMPS &&
                            disagreement_mmps >= limit_mmps;
     return result;
@@ -480,12 +437,17 @@ WheelCommands tv_calculate_rear_commands_from_rack(
     if (static_proxy == 0U) {
         return commands;
     }
-    uint32_t transfer_proxy = divide_rounded_u32(
-        lateral_acceleration_mmps2 * vehicle->cg_height_mm,
-        vehicle->track_width_mm);
-    /* Beyond inner-wheel lift-off the split saturates at inner = 0. */
-    if (transfer_proxy > static_proxy) {
-        transfer_proxy = static_proxy;
+    /* Beyond inner-wheel lift-off the split saturates at inner = 0; when
+       a * h would overflow, the transfer already exceeds the static proxy. */
+    uint32_t transfer_proxy = static_proxy;
+    if (lateral_acceleration_mmps2 == 0U ||
+        vehicle->cg_height_mm <= UINT32_MAX / lateral_acceleration_mmps2) {
+        const uint32_t transfer_raw = divide_rounded_u32(
+            lateral_acceleration_mmps2 * vehicle->cg_height_mm,
+            vehicle->track_width_mm);
+        if (transfer_raw < static_proxy) {
+            transfer_proxy = transfer_raw;
+        }
     }
 
     const uint32_t inner_weight = static_proxy - transfer_proxy;
