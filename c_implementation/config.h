@@ -34,4 +34,33 @@
 /** Maximum accepted speed sensor value [mm/s]; 100000 = 100 m/s. */
 #define TV_CONFIG_MAX_SPEED_MMPS 100000U
 
+/** EWMA weight for a new wheel-speed sample [permille]; 200 = 0.2. */
+#ifndef TV_CONFIG_EWMA_ALPHA_PERMILLE
+#define TV_CONFIG_EWMA_ALPHA_PERMILLE 200U
+#endif
+
+/**
+ * Yaw-rate magnitude at or below which all four wheel speeds are averaged
+ * [mrad/s]; 50 = 0.050 rad/s.
+ */
+#ifndef TV_CONFIG_STRAIGHT_YAW_MRADPS
+#define TV_CONFIG_STRAIGHT_YAW_MRADPS 50U
+#endif
+
+/**
+ * Relative front/rear disagreement that flags wheel slip [permille of the
+ * rear-projected front-axle speed]; 100 = 10%.
+ */
+#ifndef TV_CONFIG_SLIP_SPEED_PERMILLE
+#define TV_CONFIG_SLIP_SPEED_PERMILLE 100U
+#endif
+
+/**
+ * Minimum absolute front/rear disagreement that can flag wheel slip [mm/s];
+ * keeps sensor noise near standstill from raising false positives.
+ */
+#ifndef TV_CONFIG_SLIP_MIN_MMPS
+#define TV_CONFIG_SLIP_MIN_MMPS 300U
+#endif
+
 #endif

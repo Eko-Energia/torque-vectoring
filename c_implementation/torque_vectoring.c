@@ -33,6 +33,85 @@ static uint64_t divide_rounded_u64(uint64_t numerator, uint64_t denominator)
     return (numerator + denominator / 2U) / denominator;
 }
 
+/**
+ * @brief Floor of sqrt(value) for a 64-bit radicand.
+ *
+ * Digit-by-digit integer square root; the result always fits in 32 bits.
+ */
+static uint32_t isqrt_u64(uint64_t value)
+{
+    uint64_t remainder = value;
+    uint64_t root = 0U;
+    uint64_t bit = (uint64_t)1U << 62;
+
+    while (bit > remainder) {
+        bit >>= 2;
+    }
+    while (bit != 0U) {
+        if (remainder >= root + bit) {
+            remainder -= root + bit;
+            root = (root >> 1) + bit;
+        } else {
+            root >>= 1;
+        }
+        bit >>= 2;
+    }
+    return (uint32_t)root;
+}
+
+/** @brief sqrt(value) rounded to the nearest unsigned 32-bit integer. */
+static uint32_t isqrt_rounded_u64(uint64_t value)
+{
+    const uint32_t root = isqrt_u64(value);
+    if (root == UINT32_MAX) {
+        return root;
+    }
+    const uint64_t remainder = value - (uint64_t)root * root;
+    if (remainder > root) {
+        return root + 1U;
+    }
+    return root;
+}
+
+/** @brief Distance from the rear axle to the CoM; zero if the CoM is on the axle. */
+static uint32_t rear_axle_to_cg_mm(const VehicleParameters *vehicle)
+{
+    const int32_t lr_mm =
+        ((int32_t)vehicle->wheelbase_mm -
+         2 * (int32_t)vehicle->cg_offset_from_midpoint_mm) / 2;
+    return absolute_i32(lr_mm);
+}
+
+/** @brief Absolute difference of two unsigned speeds. */
+static uint32_t unsigned_delta_u32(uint32_t a, uint32_t b)
+{
+    return a >= b ? a - b : b - a;
+}
+
+/**
+ * @brief True when both speeds are at most TV_CONFIG_MAX_SPEED_MMPS.
+ *
+ * Rejecting out-of-range sensor values here also keeps every intermediate
+ * kinematic product within 64 bits and every result within 32 bits.
+ */
+static bool speeds_in_range_mmps(uint32_t a_mmps, uint32_t b_mmps)
+{
+    return a_mmps <= TV_CONFIG_MAX_SPEED_MMPS &&
+           b_mmps <= TV_CONFIG_MAX_SPEED_MMPS;
+}
+
+/** @brief hypot(a, b) rounded to the nearest unsigned 32-bit integer. */
+static uint32_t hypot_rounded_u32(uint32_t a, uint32_t b)
+{
+    const uint64_t a_squared = (uint64_t)a * a;
+    const uint64_t b_squared = (uint64_t)b * b;
+    const uint64_t sum =
+        a_squared > UINT64_MAX - b_squared
+            ? UINT64_MAX
+            : a_squared + b_squared;
+    return isqrt_rounded_u64(sum);
+}
+
 /** @brief Adds an unsigned offset and clamps it to the configured command range. */
 static int32_t command_from_offset(
     const VehicleParameters *vehicle,
@@ -60,9 +139,10 @@ VehicleParameters tv_default_vehicle(void)
         /* CG is 40 mm ahead of the wheelbase midpoint. */
         .cg_offset_from_midpoint_mm = -40,
 
-        /* Axle spacing and rear track width [mm]. */
+        /* Axle spacing, rear track width, and dynamic wheel radius [mm]. */
         .wheelbase_mm = 2750U,
         .track_width_mm = 1700U,
+        .wheel_radius_mm = 350U,
 
         /* Tyre-road friction coefficient: 800 / 1000 = 0.8. */
         .friction_permille = 800U,
@@ -96,6 +176,143 @@ uint32_t tv_rack_displacement_to_radius_mm(int32_t rack_displacement_mm)
         return 0U;
     }
     return (uint32_t)corrected_radius_mm;
+}
+
+uint32_t tv_com_velocity_from_rear_wheels_mmps(
+    const VehicleParameters *vehicle,
+    uint32_t rear_left_speed_mmps,
+    uint32_t rear_right_speed_mmps)
+{
+    if (vehicle == NULL || vehicle->track_width_mm == 0U ||
+        !speeds_in_range_mmps(rear_left_speed_mmps, rear_right_speed_mmps)) {
+        return 0U;
+    }
+
+    const uint32_t vx_mmps = (uint32_t)divide_rounded_u64(
+        (uint64_t)rear_left_speed_mmps + rear_right_speed_mmps, 2U);
+    const uint32_t speed_diff_mmps =
+        unsigned_delta_u32(rear_left_speed_mmps, rear_right_speed_mmps);
+    const uint32_t vy_mmps = (uint32_t)divide_rounded_u64(
+        (uint64_t)speed_diff_mmps * rear_axle_to_cg_mm(vehicle),
+        vehicle->track_width_mm);
+    return hypot_rounded_u32(vx_mmps, vy_mmps);
+}
+
+uint32_t tv_wheel_rpm_to_speed_mmps(
+    const VehicleParameters *vehicle,
+    uint32_t rpm)
+{
+    if (vehicle == NULL || vehicle->wheel_radius_mm == 0U) {
+        return 0U;
+    }
+
+    /* v = RPM * r * π / 30 with π ≈ 355/113 → RPM * r * 355 / 3390. */
+    const uint64_t speed_mmps = divide_rounded_u64(
+        (uint64_t)rpm * vehicle->wheel_radius_mm * 355U, 3390U);
+    return speed_mmps > UINT32_MAX ? UINT32_MAX : (uint32_t)speed_mmps;
+}
+
+uint32_t tv_wheel_angular_speed_to_linear_mmps(
+    const VehicleParameters *vehicle,
+    uint32_t angular_speed_mradps)
+{
+    if (vehicle == NULL || vehicle->wheel_radius_mm == 0U) {
+        return 0U;
+    }
+
+    const uint64_t speed_mmps = divide_rounded_u64(
+        (uint64_t)angular_speed_mradps * vehicle->wheel_radius_mm, 1000U);
+    return speed_mmps > UINT32_MAX ? UINT32_MAX : (uint32_t)speed_mmps;
+}
+
+uint32_t tv_filter_wheel_speed_mmps(
+    TvWheelSpeedFilter *filter,
+    uint32_t sample_mmps)
+{
+    if (filter == NULL) {
+        return 0U;
+    }
+    if (!filter->initialized) {
+        filter->speed_mmps = sample_mmps;
+        filter->initialized = true;
+        return sample_mmps;
+    }
+
+    uint32_t alpha_permille = TV_CONFIG_EWMA_ALPHA_PERMILLE;
+    if (alpha_permille > 1000U) {
+        alpha_permille = 1000U;
+    }
+    const uint32_t filtered_mmps = (uint32_t)divide_rounded_u64(
+        (uint64_t)alpha_permille * sample_mmps +
+            (uint64_t)(1000U - alpha_permille) * filter->speed_mmps,
+        1000U);
+    filter->speed_mmps = filtered_mmps;
+    return filtered_mmps;
+}
+
+uint32_t tv_com_velocity_from_wheel_speeds_mmps(
+    const VehicleParameters *vehicle,
+    uint32_t front_left_speed_mmps,
+    uint32_t front_right_speed_mmps,
+    uint32_t rear_left_speed_mmps,
+    uint32_t rear_right_speed_mmps)
+{
+    if (vehicle == NULL || vehicle->track_width_mm == 0U ||
+        !speeds_in_range_mmps(front_left_speed_mmps, front_right_speed_mmps) ||
+        !speeds_in_range_mmps(rear_left_speed_mmps, rear_right_speed_mmps)) {
+        return 0U;
+    }
+
+    const uint32_t yaw_mradps = (uint32_t)divide_rounded_u64(
+        (uint64_t)unsigned_delta_u32(rear_left_speed_mmps, rear_right_speed_mmps) *
+            1000U,
+        vehicle->track_width_mm);
+    if (yaw_mradps <= TV_CONFIG_STRAIGHT_YAW_MRADPS) {
+        return (uint32_t)divide_rounded_u64(
+            (uint64_t)front_left_speed_mmps + front_right_speed_mmps +
+                rear_left_speed_mmps + rear_right_speed_mmps,
+            4U);
+    }
+    return tv_com_velocity_from_rear_wheels_mmps(
+        vehicle, rear_left_speed_mmps, rear_right_speed_mmps);
+}
+
+TvSlipCheck tv_check_wheel_slip(
+    const VehicleParameters *vehicle,
+    uint32_t front_left_speed_mmps,
+    uint32_t front_right_speed_mmps,
+    uint32_t rear_left_speed_mmps,
+    uint32_t rear_right_speed_mmps)
+{
+    TvSlipCheck result = {0};
+    if (vehicle == NULL || vehicle->track_width_mm == 0U ||
+        !speeds_in_range_mmps(front_left_speed_mmps, front_right_speed_mmps) ||
+        !speeds_in_range_mmps(rear_left_speed_mmps, rear_right_speed_mmps)) {
+        return result;
+    }
+
+    result.rear_com_velocity_mmps = tv_com_velocity_from_rear_wheels_mmps(
+        vehicle, rear_left_speed_mmps, rear_right_speed_mmps);
+
+    const uint32_t vx_mmps = (uint32_t)divide_rounded_u64(
+        (uint64_t)rear_left_speed_mmps + rear_right_speed_mmps, 2U);
+    const uint32_t omega_times_wheelbase_mmps = (uint32_t)divide_rounded_u64(
+        (uint64_t)unsigned_delta_u32(rear_left_speed_mmps, rear_right_speed_mmps) *
+            vehicle->wheelbase_mm,
+        vehicle->track_width_mm);
+    result.front_projected_mmps =
+        hypot_rounded_u32(vx_mmps, omega_times_wheelbase_mmps);
+    result.front_measured_mmps = (uint32_t)divide_rounded_u64(
+        (uint64_t)front_left_speed_mmps + front_right_speed_mmps, 2U);
+
+    const uint32_t disagreement_mmps = unsigned_delta_u32(
+        result.front_measured_mmps, result.front_projected_mmps);
+    const uint32_t limit_mmps = (uint32_t)divide_rounded_u64(
+        (uint64_t)result.front_projected_mmps * TV_CONFIG_SLIP_SPEED_PERMILLE,
+        1000U);
+    result.slip_detected = disagreement_mmps >= TV_CONFIG_SLIP_MIN_MMPS &&
+                           disagreement_mmps >= limit_mmps;
+    return result;
 }
 
 WheelCommands tv_calculate_rear_commands_from_rack(
