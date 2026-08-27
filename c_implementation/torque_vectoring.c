@@ -431,11 +431,13 @@ WheelCommands tv_calculate_rear_commands_from_rack(
        4*L*t, which keeps them proportional and below 2^16. */
     const int32_t rear_numerator_mm = (int32_t)vehicle->wheelbase_mm +
         2 * (int32_t)vehicle->cg_offset_from_midpoint_mm;
-    const uint32_t static_proxy = divide_rounded_u32(
+    uint32_t static_proxy = divide_rounded_u32(
         (uint32_t)vehicle->gravity_mmps2 * (uint32_t)rear_numerator_mm,
         4U * vehicle->wheelbase_mm);
     if (static_proxy == 0U) {
-        return commands;
+        /* CG almost on the front axle: keep the smallest nonzero rear load
+           so the split still resolves (inner 0, outer saturated). */
+        static_proxy = 1U;
     }
     /* Beyond inner-wheel lift-off the split saturates at inner = 0; when
        a * h would overflow, the transfer already exceeds the static proxy. */

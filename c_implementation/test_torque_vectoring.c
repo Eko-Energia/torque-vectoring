@@ -100,6 +100,17 @@ int main(void)
     assert(custom.rear_left == 28);
     assert(custom.rear_right == 72);
 
+    /* CG almost on the front axle: valid input, split saturates outward. */
+    VehicleParameters front_heavy = vehicle;
+    front_heavy.wheelbase_mm = 5000U;
+    front_heavy.cg_offset_from_midpoint_mm = -2499;
+    front_heavy.gravity_mmps2 = 1000U;
+    const WheelCommands front_cg = tv_calculate_rear_commands_from_rack(
+        &front_heavy, true, 70, 2000U, pedal_midpoint);
+    assert(front_cg.status == TV_OK);
+    assert(front_cg.rear_left == front_heavy.command_min);
+    assert(front_cg.rear_right == front_heavy.command_max);
+
     assert(tv_com_velocity_from_rear_wheels_mmps(&vehicle, 5000U, 5000U) ==
            5000U);
     assert(tv_com_velocity_from_rear_wheels_mmps(&vehicle, 0U, 0U) == 0U);
