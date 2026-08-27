@@ -31,7 +31,10 @@
 /** Signed radius correction applied after scaling [mm]. */
 #define TV_CONFIG_RADIUS_CORRECTION_OFFSET_MM 0
 
-/** Maximum accepted speed sensor value [mm/s]; 100000 = 100 m/s. */
+/**
+ * Maximum accepted speed sensor value [mm/s]; 100000 = 100 m/s.
+ * Must not exceed 131070 so that all speed products fit in 32 bits.
+ */
 #define TV_CONFIG_MAX_SPEED_MMPS 100000U
 
 /** EWMA weight for a new wheel-speed sample [permille]; 200 = 0.2. */

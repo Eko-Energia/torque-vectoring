@@ -144,8 +144,10 @@ podziału momentu.
 ## Implementacja STM32
 
 Ścieżka sterująca nie używa `float`, `double`, `pow()`, `hypot()` ani biblioteki
-`libm`. Wejścia i wyjścia mają typy 32-bitowe, a mnożenia pośrednie są wykonywane
-na 64 bitach, aby uniknąć przepełnienia. Jednostki to `mm`, `mm/s`, `mm/s²` oraz
+`libm`. Cała arytmetyka, łącznie z wynikami pośrednimi, jest 32-bitowa: operacje
+64-bitowe na rdzeniach 32-bitowych są emulowane programowo (`__aeabi_uldivmod`
+i podobne), więc zamiast nich równania zostały przeskalowane, a udokumentowane
+zakresy parametrów są sprawdzane. Jednostki to `mm`, `mm/s`, `mm/s²` oraz
 promile. Dzielenie jest zaokrąglane do najbliższej liczby całkowitej.
 
 Masa, współczynnik tarcia i promień koła skracają się przy liczeniu proporcji

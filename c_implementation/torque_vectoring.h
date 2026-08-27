@@ -4,6 +4,11 @@
  *
  * The real-time path uses fixed physical units and contains no floating-point
  * operations, dynamic allocation, or dependency on math.h/libm/arm_math.
+ * All arithmetic is 32-bit: no 64-bit types appear even in intermediate
+ * results, so no software 64-bit helpers (__aeabi_uldivmod and similar) are
+ * linked on 32-bit cores. This requires the physical parameter bounds
+ * documented on VehicleParameters; the kinematics functions reject speeds
+ * above TV_CONFIG_MAX_SPEED_MMPS.
  */
 
 #ifndef TORQUE_VECTORING_H
@@ -12,36 +17,44 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/** @brief Physical parameters and command range of the vehicle Perła. */
+/**
+ * @brief Physical parameters and command range of the vehicle Perła.
+ *
+ * The documented ranges are enforced by the calculations so that every
+ * intermediate product fits in 32 bits; out-of-range parameters make the
+ * functions report an invalid vehicle.
+ */
 typedef struct {
-    /** Vehicle mass [kg]. */
+    /** Vehicle mass [kg]; must be non-zero. */
     uint16_t mass_kg;
 
-    /** Centre-of-mass height above ground, h [mm]. */
+    /** Centre-of-mass height above ground, h [mm]; valid range 1 to 2000. */
     uint16_t cg_height_mm;
 
     /**
      * Longitudinal centre-of-mass offset x_c [mm]. Positive points toward the
      * rear; -40 means 40 mm toward the front from the wheelbase midpoint.
+     * |2 * x_c| must be smaller than wheelbase_mm.
      */
     int16_t cg_offset_from_midpoint_mm;
 
-    /** Distance between front and rear axle centres, L [mm]. */
+    /** Distance between front and rear axle centres, L [mm]; 500 to 5000. */
     uint16_t wheelbase_mm;
 
-    /** Distance between left and right wheel centres, t [mm]. */
+    /** Distance between left and right wheel centres, t [mm]; 500 to 5000. */
     uint16_t track_width_mm;
 
     /**
-     * Dynamic wheel radius r [mm]. Used to convert wheel RPM or milliradians
-     * per second to linear speed. The torque split does not use this field.
+     * Dynamic wheel radius r [mm]; at most 1000, 0 if unknown. Used to convert
+     * wheel RPM or milliradians per second to linear speed. The torque split
+     * does not use this field.
      */
     uint16_t wheel_radius_mm;
 
-    /** Tyre friction coefficient [1/1000]; 800 represents 0.8. */
+    /** Tyre friction coefficient [1/1000]; 800 represents 0.8; 1 to 2000. */
     uint16_t friction_permille;
 
-    /** Gravitational acceleration [mm/s^2]. */
+    /** Gravitational acceleration [mm/s^2]; valid range 1000 to 20000. */
     uint16_t gravity_mmps2;
 
     /** Pedal/output value representing zero requested torque. */
@@ -147,8 +160,9 @@ uint32_t tv_rack_displacement_to_radius_mm(int32_t rack_displacement_mm);
  * @param vehicle Pointer to vehicle geometry; must remain valid for the call.
  * @param rear_left_speed_mmps Rear-left wheel linear speed [mm/s].
  * @param rear_right_speed_mmps Rear-right wheel linear speed [mm/s].
- * @return CoM speed [mm/s], or 0 if vehicle is NULL, track width is zero, or
- *         any speed exceeds TV_CONFIG_MAX_SPEED_MMPS.
+ * @return CoM speed [mm/s], or 0 if the vehicle geometry is missing or
+ *         outside the documented ranges, or any speed exceeds
+ *         TV_CONFIG_MAX_SPEED_MMPS.
  *
  * Uses bicycle-model kinematics with the non-steered rear axle:
  * v_x = (v_RL + v_RR) / 2,
@@ -168,9 +182,11 @@ uint32_t tv_com_velocity_from_rear_wheels_mmps(
  * @brief Converts wheel rotation rate in RPM to linear speed.
  * @param vehicle Pointer to parameters providing wheel_radius_mm.
  * @param rpm Wheel rotational speed in revolutions per minute.
- * @return Linear speed [mm/s], or 0 if vehicle is NULL or radius is zero.
+ * @return Linear speed [mm/s], or 0 if vehicle is NULL or radius is zero or
+ *         above 1000 mm.
  *
  * Uses v = RPM * r * π / 30 with π ≈ 355/113 and nearest-integer division.
+ * Inputs whose product would overflow 32 bits saturate to UINT32_MAX.
  */
 uint32_t tv_wheel_rpm_to_speed_mmps(
     const VehicleParameters *vehicle,
@@ -181,9 +197,11 @@ uint32_t tv_wheel_rpm_to_speed_mmps(
  * @brief Converts wheel angular speed to linear speed.
  * @param vehicle Pointer to parameters providing wheel_radius_mm.
  * @param angular_speed_mradps Angular speed [mrad/s]; 1000 = 1 rad/s.
- * @return Linear speed [mm/s], or 0 if vehicle is NULL or radius is zero.
+ * @return Linear speed [mm/s], or 0 if vehicle is NULL or radius is zero or
+ *         above 1000 mm.
  *
  * Uses v = ω * r with milliradian scaling: v_mmps = ω_mradps * r_mm / 1000.
+ * Inputs whose product would overflow 32 bits saturate to UINT32_MAX.
  */
 uint32_t tv_wheel_angular_speed_to_linear_mmps(
     const VehicleParameters *vehicle,
@@ -193,7 +211,9 @@ uint32_t tv_wheel_angular_speed_to_linear_mmps(
 /**
  * @brief Applies a fixed-point EWMA to one wheel-speed sample.
  * @param filter Caller-owned filter state; must remain valid for the call.
- * @param sample_mmps New linear speed reading [mm/s].
+ * @param sample_mmps New linear speed reading [mm/s]. Samples above
+ *        TV_CONFIG_MAX_SPEED_MMPS are ignored like a missing frame: the
+ *        state stays unchanged and the last filtered speed is returned.
  * @return Filtered speed [mm/s], or 0 if filter is NULL.
  *
  * The first sample initialises the state. Later updates use
@@ -213,8 +233,9 @@ uint32_t tv_filter_wheel_speed_mmps(
  * @param front_right_speed_mmps Front-right wheel linear speed [mm/s].
  * @param rear_left_speed_mmps Rear-left wheel linear speed [mm/s].
  * @param rear_right_speed_mmps Rear-right wheel linear speed [mm/s].
- * @return CoM speed [mm/s], or 0 if vehicle is NULL, track width is zero, or
- *         any speed exceeds TV_CONFIG_MAX_SPEED_MMPS.
+ * @return CoM speed [mm/s], or 0 if the vehicle geometry is missing or
+ *         outside the documented ranges, or any speed exceeds
+ *         TV_CONFIG_MAX_SPEED_MMPS.
  *
  * When the rear-axle yaw rate is at or below TV_CONFIG_STRAIGHT_YAW_MRADPS,
  * returns the average of all four speeds. Otherwise returns the rear-axle
@@ -235,9 +256,9 @@ uint32_t tv_com_velocity_from_wheel_speeds_mmps(
  * @param front_right_speed_mmps Front-right wheel linear speed [mm/s].
  * @param rear_left_speed_mmps Rear-left wheel linear speed [mm/s].
  * @param rear_right_speed_mmps Rear-right wheel linear speed [mm/s].
- * @return Diagnostic speeds and slip_detected. All speeds are 0 if vehicle is
- *         NULL, track width is zero, or any speed exceeds
- *         TV_CONFIG_MAX_SPEED_MMPS.
+ * @return Diagnostic speeds and slip_detected. All speeds are 0 if the
+ *         vehicle geometry is missing or outside the documented ranges, or
+ *         any speed exceeds TV_CONFIG_MAX_SPEED_MMPS.
  *
  * Projects the front-axle centre speed as hypot(v_x, ω * L) from the rear
  * wheels and compares it with (v_FL + v_FR) / 2. Disagreement of at least
