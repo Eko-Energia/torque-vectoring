@@ -147,7 +147,8 @@ uint32_t tv_rack_displacement_to_radius_mm(int32_t rack_displacement_mm);
  * @param vehicle Pointer to vehicle geometry; must remain valid for the call.
  * @param rear_left_speed_mmps Rear-left wheel linear speed [mm/s].
  * @param rear_right_speed_mmps Rear-right wheel linear speed [mm/s].
- * @return CoM speed [mm/s], or 0 if vehicle is NULL or track width is zero.
+ * @return CoM speed [mm/s], or 0 if vehicle is NULL, track width is zero, or
+ *         any speed exceeds TV_CONFIG_MAX_SPEED_MMPS.
  *
  * Uses bicycle-model kinematics with the non-steered rear axle:
  * v_x = (v_RL + v_RR) / 2,
@@ -212,7 +213,8 @@ uint32_t tv_filter_wheel_speed_mmps(
  * @param front_right_speed_mmps Front-right wheel linear speed [mm/s].
  * @param rear_left_speed_mmps Rear-left wheel linear speed [mm/s].
  * @param rear_right_speed_mmps Rear-right wheel linear speed [mm/s].
- * @return CoM speed [mm/s], or 0 if vehicle is NULL or track width is zero.
+ * @return CoM speed [mm/s], or 0 if vehicle is NULL, track width is zero, or
+ *         any speed exceeds TV_CONFIG_MAX_SPEED_MMPS.
  *
  * When the rear-axle yaw rate is at or below TV_CONFIG_STRAIGHT_YAW_MRADPS,
  * returns the average of all four speeds. Otherwise returns the rear-axle
@@ -234,11 +236,14 @@ uint32_t tv_com_velocity_from_wheel_speeds_mmps(
  * @param rear_left_speed_mmps Rear-left wheel linear speed [mm/s].
  * @param rear_right_speed_mmps Rear-right wheel linear speed [mm/s].
  * @return Diagnostic speeds and slip_detected. All speeds are 0 if vehicle is
- *         NULL or track width is zero.
+ *         NULL, track width is zero, or any speed exceeds
+ *         TV_CONFIG_MAX_SPEED_MMPS.
  *
  * Projects the front-axle centre speed as hypot(v_x, ω * L) from the rear
  * wheels and compares it with (v_FL + v_FR) / 2. Disagreement of at least
- * TV_CONFIG_SLIP_SPEED_PERMILLE of the projected speed flags slip.
+ * TV_CONFIG_SLIP_SPEED_PERMILLE of the projected speed flags slip, but never
+ * less than TV_CONFIG_SLIP_MIN_MMPS, so sensor noise near standstill does not
+ * raise false positives.
  */
 TvSlipCheck tv_check_wheel_slip(
     const VehicleParameters *vehicle,

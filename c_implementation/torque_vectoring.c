@@ -88,6 +88,18 @@ static uint32_t unsigned_delta_u32(uint32_t a, uint32_t b)
     return a >= b ? a - b : b - a;
 }
 
+/**
+ * @brief True when both speeds are at most TV_CONFIG_MAX_SPEED_MMPS.
+ *
+ * Rejecting out-of-range sensor values here also keeps every intermediate
+ * kinematic product within 64 bits and every result within 32 bits.
+ */
+static bool speeds_in_range_mmps(uint32_t a_mmps, uint32_t b_mmps)
+{
+    return a_mmps <= TV_CONFIG_MAX_SPEED_MMPS &&
+           b_mmps <= TV_CONFIG_MAX_SPEED_MMPS;
+}
+
 /** @brief hypot(a, b) rounded to the nearest unsigned 32-bit integer. */
 static uint32_t hypot_rounded_u32(uint32_t a, uint32_t b)
 {
@@ -171,7 +183,8 @@ uint32_t tv_com_velocity_from_rear_wheels_mmps(
     uint32_t rear_left_speed_mmps,
     uint32_t rear_right_speed_mmps)
 {
-    if (vehicle == NULL || vehicle->track_width_mm == 0U) {
+    if (vehicle == NULL || vehicle->track_width_mm == 0U ||
+        !speeds_in_range_mmps(rear_left_speed_mmps, rear_right_speed_mmps)) {
         return 0U;
     }
 
@@ -244,7 +257,9 @@ uint32_t tv_com_velocity_from_wheel_speeds_mmps(
     uint32_t rear_left_speed_mmps,
     uint32_t rear_right_speed_mmps)
 {
-    if (vehicle == NULL || vehicle->track_width_mm == 0U) {
+    if (vehicle == NULL || vehicle->track_width_mm == 0U ||
+        !speeds_in_range_mmps(front_left_speed_mmps, front_right_speed_mmps) ||
+        !speeds_in_range_mmps(rear_left_speed_mmps, rear_right_speed_mmps)) {
         return 0U;
     }
 
@@ -270,7 +285,9 @@ TvSlipCheck tv_check_wheel_slip(
     uint32_t rear_right_speed_mmps)
 {
     TvSlipCheck result = {0};
-    if (vehicle == NULL || vehicle->track_width_mm == 0U) {
+    if (vehicle == NULL || vehicle->track_width_mm == 0U ||
+        !speeds_in_range_mmps(front_left_speed_mmps, front_right_speed_mmps) ||
+        !speeds_in_range_mmps(rear_left_speed_mmps, rear_right_speed_mmps)) {
         return result;
     }
 
@@ -293,7 +310,8 @@ TvSlipCheck tv_check_wheel_slip(
     const uint32_t limit_mmps = (uint32_t)divide_rounded_u64(
         (uint64_t)result.front_projected_mmps * TV_CONFIG_SLIP_SPEED_PERMILLE,
         1000U);
-    result.slip_detected = disagreement_mmps > 0U && disagreement_mmps >= limit_mmps;
+    result.slip_detected = disagreement_mmps >= TV_CONFIG_SLIP_MIN_MMPS &&
+                           disagreement_mmps >= limit_mmps;
     return result;
 }
 

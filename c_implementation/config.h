@@ -55,4 +55,12 @@
 #define TV_CONFIG_SLIP_SPEED_PERMILLE 100U
 #endif
 
+/**
+ * Minimum absolute front/rear disagreement that can flag wheel slip [mm/s];
+ * keeps sensor noise near standstill from raising false positives.
+ */
+#ifndef TV_CONFIG_SLIP_MIN_MMPS
+#define TV_CONFIG_SLIP_MIN_MMPS 300U
+#endif
+
 #endif

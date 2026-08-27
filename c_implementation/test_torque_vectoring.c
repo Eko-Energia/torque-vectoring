@@ -108,6 +108,8 @@ int main(void)
     assert(tv_com_velocity_from_rear_wheels_mmps(&vehicle, 6000U, 4000U) ==
            5270U);
     assert(tv_com_velocity_from_rear_wheels_mmps(NULL, 5000U, 5000U) == 0U);
+    assert(tv_com_velocity_from_rear_wheels_mmps(&vehicle, 100001U, 5000U) ==
+           0U);
 
     VehicleParameters wide_track = vehicle;
     wide_track.track_width_mm = 2000U;
@@ -133,6 +135,8 @@ int main(void)
                &vehicle, 0U, 0U, 4000U, 6000U) == 5270U);
     assert(tv_com_velocity_from_wheel_speeds_mmps(
                NULL, 5000U, 5000U, 5000U, 5000U) == 0U);
+    assert(tv_com_velocity_from_wheel_speeds_mmps(
+               &vehicle, 100001U, 5000U, 5000U, 5000U) == 0U);
 
     const TvSlipCheck no_slip = tv_check_wheel_slip(
         &vehicle, 5955U, 5955U, 4000U, 6000U);
@@ -153,7 +157,15 @@ int main(void)
     const TvSlipCheck standing = tv_check_wheel_slip(
         &vehicle, 0U, 0U, 0U, 0U);
     assert(!standing.slip_detected);
+
+    /* Sensor noise while crawling must stay below the absolute deadband. */
+    const TvSlipCheck crawling = tv_check_wheel_slip(
+        &vehicle, 250U, 250U, 0U, 0U);
+    assert(!crawling.slip_detected);
+
     assert(tv_check_wheel_slip(NULL, 5000U, 5000U, 5000U, 5000U)
+               .rear_com_velocity_mmps == 0U);
+    assert(tv_check_wheel_slip(&vehicle, 5000U, 5000U, 100001U, 5000U)
                .rear_com_velocity_mmps == 0U);
 
     puts("All integer tests passed.");
