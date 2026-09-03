@@ -145,9 +145,11 @@ in range while preserving the torque split takes priority.
 ## STM32 implementation
 
 The real-time control path uses no `float`, `double`, `pow()`, `hypot()`, or
-`libm`. Inputs and outputs use 32-bit types, while intermediate products use
-64-bit integers to prevent overflow. Units are `mm`, `mm/s`, `mm/s²`, and
-permille. Division is rounded to the nearest integer.
+`libm`. All arithmetic is 32-bit, including intermediate products: 64-bit
+operations are emulated in software on 32-bit cores (`__aeabi_uldivmod` and
+similar), so the equations are rescaled and the documented parameter ranges
+are validated instead. Units are `mm`, `mm/s`, `mm/s²`, and permille.
+Division is rounded to the nearest integer.
 
 Mass, friction coefficient, and wheel radius cancel when calculating the torque
 ratio. Friction is still used to detect the lateral-grip limit. Maximum accepted

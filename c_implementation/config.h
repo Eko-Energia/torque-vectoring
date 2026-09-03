@@ -22,7 +22,10 @@
 /** Largest calibrated rack displacement magnitude [mm]. */
 #define TV_CONFIG_RACK_MAX_MM 70U
 
-/** Constant C [m*mm] in the fitted relation R_m = C / abs(rack_mm). */
+/**
+ * Constant C [m*mm] in the fitted relation R_m = C / abs(rack_mm).
+ * Keep C * 1000 * correction permille below 2^31 (32-bit implementation).
+ */
 #define TV_CONFIG_RACK_RADIUS_CONSTANT_M_MM 507U
 
 /** Radius scale [permille]; 1000 = 1.000, 980 = 0.980. */
@@ -31,7 +34,10 @@
 /** Signed radius correction applied after scaling [mm]. */
 #define TV_CONFIG_RADIUS_CORRECTION_OFFSET_MM 0
 
-/** Maximum accepted speed sensor value [mm/s]; 100000 = 100 m/s. */
+/**
+ * Maximum accepted speed sensor value [mm/s]; 100000 = 100 m/s.
+ * Must not exceed 131070 so that all speed products fit in 32 bits.
+ */
 #define TV_CONFIG_MAX_SPEED_MMPS 100000U
 
 /** EWMA weight for a new wheel-speed sample [permille]; 200 = 0.2. */
