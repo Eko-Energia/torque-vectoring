@@ -60,12 +60,38 @@ The same file contains coefficients reserved for radius correction after testing
 
 `1000` means a `1.000` multiplier; for example, `980` means `0.980`.
 
+## Torque-vectoring gain
+
+`tv_calculate_rear_commands_from_rack` takes a `tv_gain_percent` argument (`0`
+to `100`) that blends the calculated split toward an equal split on both rear
+wheels — the same behaviour as an open differential giving constant torque to
+each side. `100` is the previous, unblended behaviour: the full load-transfer
+split. `0` sends the pedal value to both wheels regardless of the calculated
+split, identical to the rack-unavailable fallback. Intermediate values blend
+linearly between the two, and the wheel commands still sum to `2 *
+pedal_command` whenever the full split itself is not saturated. Values above
+`100` are clamped to `100`.
+
+This lets the driver (or a surface-preset switch) choose, per drive or per
+lap, how much of the calculated cornering split to actually apply versus
+falling back to plain equal torque — useful on low-grip surfaces or simply as
+a driver preference. It is a per-call argument, not a vehicle constant,
+because it is expected to change while driving, unlike the fields in
+`VehicleParameters`.
+
 ## Run
 
 ```sh
 make
 ./build/torque-vectoring 70 5000 128
 make test
+```
+
+Add `--gain=N` (0-100) to blend toward an equal split; the default is `100`
+(full torque vectoring):
+
+```sh
+./build/torque-vectoring 70 5000 128 --gain=50
 ```
 
 When rack position is unavailable, provide only speed and pedal input:

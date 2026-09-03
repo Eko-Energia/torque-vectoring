@@ -59,12 +59,39 @@ W tym samym pliku znajdują się współczynniki do późniejszej korekcji promi
 
 `1000` oznacza mnożnik `1,000`; np. `980` oznacza `0,980`.
 
+## Siła torque vectoringu
+
+Funkcja `tv_calculate_rear_commands_from_rack` przyjmuje argument
+`tv_gain_percent` (`0` do `100`), który przesuwa wyliczony podział momentu w
+stronę podziału równego na oba tylne koła — czyli zachowania zwykłego
+dyferencjału dającego stały moment na oba koła. `100` to dotychczasowe
+zachowanie: pełny podział wyliczony z przeniesienia obciążenia. `0` wysyła
+wartość pedału na oba koła niezależnie od wyliczonego podziału, tak samo jak
+przy braku pomiaru maglownicy. Wartości pośrednie mieszają oba warianty
+liniowo, a suma komend obu kół nadal wynosi `2 * pedal_command`, o ile sam
+pełny podział nie jest nasycony. Wartości powyżej `100` są ograniczane do
+`100`.
+
+Dzięki temu kierowca (albo przełącznik nawierzchni) może wybrać, w danej
+jeździe czy na danym okrążeniu, w jakim stopniu stosować wyliczony podział na
+zakręcie, a w jakim wrócić do zwykłego równego momentu — przydatne na
+nawierzchniach o niskiej przyczepności albo po prostu jako preferencja
+kierowcy. To argument podawany przy każdym wywołaniu, a nie stała pojazdu w
+`VehicleParameters`, ponieważ zakładamy, że może się zmieniać w trakcie jazdy.
+
 ## Uruchomienie
 
 ```sh
 make
 ./build/torque-vectoring 70 5000 128
 make test
+```
+
+Dodaj `--gain=N` (0-100), żeby przesunąć podział w stronę równego; domyślnie
+jest to `100` (pełny torque vectoring):
+
+```sh
+./build/torque-vectoring 70 5000 128 --gain=50
 ```
 
 Bez dostępnego pomiaru maglownicy podaje się tylko prędkość i pedał:

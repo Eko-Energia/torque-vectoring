@@ -23,6 +23,7 @@ CMSIS-DSP, `math.h`, `libm`, sterty ani konkretnego modelu STM32.
 | Prędkość | `uint32_t` | `5000 mm/s` = `5 m/s` |
 | Pedał | `int32_t` | domyślnie `0–256` |
 | Komendy silników | `int32_t` | ten sam zakres co pedał |
+| Siła torque vectoringu | `uint32_t` | `0–100`; `0` = zwykły dyferencjał, `100` = pełny TV |
 
 Zakres `0–256` ma 257 możliwych wartości, więc nie mieści się w `uint8_t`.
 Do transmisji należy użyć co najmniej `uint16_t` albo zmienić maksimum na `255`.
@@ -48,13 +49,17 @@ void torque_vectoring_step(void)
     const bool rack_available = steering_sensor_read_mm(&rack_mm);
     speed_mmps = vehicle_speed_read_mmps();
     pedal = pedal_read_command();
+    /* 0-100: pozycja przełącznika/pokrętła kierowcy albo presetu nawierzchni;
+       0 = zwykły dyferencjał (stały moment), 100 = pełny torque vectoring. */
+    const uint32_t tv_gain_percent = tv_gain_switch_read_percent();
 
     const WheelCommands result = tv_calculate_rear_commands_from_rack(
         &vehicle,
         rack_available,
         rack_mm,
         speed_mmps,
-        pedal
+        pedal,
+        tv_gain_percent
     );
 
     if (result.status == TV_OK) {

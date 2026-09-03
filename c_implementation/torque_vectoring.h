@@ -265,9 +265,20 @@ TvSlipCheck tv_check_wheel_slip(
  * @param vehicle_speed_mmps Non-negative vehicle speed [mm/s]. For example,
  *        5000 means 5 m/s.
  * @param pedal_command Driver demand in [vehicle.command_min, vehicle.command_max].
+ * @param tv_gain_percent Driver/surface-selectable blend between an open
+ *        differential and full torque vectoring, as a percentage from 0 to
+ *        100; 0 = equal split on both rear wheels regardless of the
+ *        calculated load transfer (identical to the rack-unavailable
+ *        fallback), 100 = full calculated split (previous, unblended
+ *        behaviour). Values above 100 are clamped to 100. Intermediate
+ *        values linearly blend each wheel's command between the two, so the
+ *        wheel commands still sum to 2 * pedal_command whenever the full
+ *        split itself is unsaturated.
  * @return Commands and diagnostics. Apply motor commands only when status is
  *         TV_OK. In fallback, both outputs equal pedal_command and
- *         torque_vectoring_active is false.
+ *         torque_vectoring_active is false. torque_vectoring_active is also
+ *         false whenever blending happens to make both commands equal, such
+ *         as tv_gain_percent == 0.
  *
  * @note Call this function once per control-loop iteration. It is re-entrant,
  * deterministic, allocation-free, and has no dependency on an FPU or DSP library.
@@ -277,7 +288,8 @@ WheelCommands tv_calculate_rear_commands_from_rack(
     bool rack_position_available,
     int32_t rack_displacement_mm,
     uint32_t vehicle_speed_mmps,
-    int32_t pedal_command
+    int32_t pedal_command,
+    uint32_t tv_gain_percent
 );
 
 /**
