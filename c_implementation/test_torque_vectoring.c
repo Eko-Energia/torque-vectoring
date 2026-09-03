@@ -26,7 +26,7 @@ int main(void)
     const int32_t pedal_midpoint = vehicle.command_min +
         (vehicle.command_max - vehicle.command_min) / 2;
     const WheelCommands left = tv_calculate_rear_commands_from_rack(
-        &vehicle, true, 70, 5000U, pedal_midpoint);
+        &vehicle, true, 70, 5000U, pedal_midpoint, 100U);
     assert(left.status == TV_OK);
     assert(left.torque_vectoring_active);
     assert(left.turn_radius_mm == 7243U);
@@ -35,70 +35,94 @@ int main(void)
     assert(left.rear_right == 184);
 
     const WheelCommands right = tv_calculate_rear_commands_from_rack(
-        &vehicle, true, -70, 5000U, pedal_midpoint);
+        &vehicle, true, -70, 5000U, pedal_midpoint, 100U);
     assert(right.status == TV_OK);
     assert(right.rear_left == left.rear_right);
     assert(right.rear_right == left.rear_left);
 
     const WheelCommands full_pedal = tv_calculate_rear_commands_from_rack(
-        &vehicle, true, 70, 5000U, vehicle.command_max);
+        &vehicle, true, 70, 5000U, vehicle.command_max, 100U);
     assert(full_pedal.status == TV_OK);
     assert(full_pedal.rear_left == 101);
     assert(full_pedal.rear_right == vehicle.command_max);
 
     const WheelCommands no_pedal = tv_calculate_rear_commands_from_rack(
-        &vehicle, true, 70, 5000U, vehicle.command_min);
+        &vehicle, true, 70, 5000U, vehicle.command_min, 100U);
     assert(no_pedal.status == TV_OK);
     assert(no_pedal.rear_left == vehicle.command_min);
     assert(no_pedal.rear_right == vehicle.command_min);
 
     const WheelCommands missing_rack = tv_calculate_rear_commands_from_rack(
-        &vehicle, false, 0, 5000U, pedal_midpoint);
+        &vehicle, false, 0, 5000U, pedal_midpoint, 100U);
     assert(missing_rack.status == TV_OK);
     assert(!missing_rack.torque_vectoring_active);
     assert(missing_rack.rear_left == pedal_midpoint);
     assert(missing_rack.rear_right == pedal_midpoint);
 
     const WheelCommands zero_rack = tv_calculate_rear_commands_from_rack(
-        &vehicle, true, 0, 5000U, pedal_midpoint);
+        &vehicle, true, 0, 5000U, pedal_midpoint, 100U);
     assert(zero_rack.status == TV_OK);
     assert(!zero_rack.torque_vectoring_active);
     assert(zero_rack.rear_left == pedal_midpoint);
     assert(zero_rack.rear_right == pedal_midpoint);
 
     const WheelCommands small_rack = tv_calculate_rear_commands_from_rack(
-        &vehicle, true, 3, 5000U, pedal_midpoint);
+        &vehicle, true, 3, 5000U, pedal_midpoint, 100U);
     assert(small_rack.status == TV_OK);
     assert(small_rack.torque_vectoring_active);
     assert(small_rack.rear_left == 126);
     assert(small_rack.rear_right == 130);
 
     const WheelCommands slip = tv_calculate_rear_commands_from_rack(
-        &vehicle, true, 70, 8000U, pedal_midpoint);
+        &vehicle, true, 70, 8000U, pedal_midpoint, 100U);
     assert(slip.status == TV_LATERAL_GRIP_EXCEEDED);
     assert(slip.rear_left == vehicle.command_min);
     assert(slip.rear_right == vehicle.command_min);
 
     const WheelCommands bad_rack = tv_calculate_rear_commands_from_rack(
-        &vehicle, true, 71, 5000U, pedal_midpoint);
+        &vehicle, true, 71, 5000U, pedal_midpoint, 100U);
     assert(bad_rack.status == TV_RACK_OUT_OF_RANGE);
 
     const WheelCommands bad_speed = tv_calculate_rear_commands_from_rack(
-        &vehicle, true, 70, 100001U, pedal_midpoint);
+        &vehicle, true, 70, 100001U, pedal_midpoint, 100U);
     assert(bad_speed.status == TV_SPEED_OUT_OF_RANGE);
 
     const WheelCommands bad_pedal = tv_calculate_rear_commands_from_rack(
-        &vehicle, true, 70, 5000U, vehicle.command_max + 1);
+        &vehicle, true, 70, 5000U, vehicle.command_max + 1, 100U);
     assert(bad_pedal.status == TV_INVALID_ARGUMENT);
 
     VehicleParameters custom_range = vehicle;
     custom_range.command_min = 0;
     custom_range.command_max = 100;
     const WheelCommands custom = tv_calculate_rear_commands_from_rack(
-        &custom_range, true, 70, 5000U, 50);
+        &custom_range, true, 70, 5000U, 50, 100U);
     assert(custom.status == TV_OK);
     assert(custom.rear_left == 28);
     assert(custom.rear_right == 72);
+
+    /* tv_gain_percent blends the full split toward the equal-split fallback:
+       0% must reproduce the fallback exactly, 100% must reproduce the
+       unblended split from `left` above, and values above 100 clamp to it. */
+    const WheelCommands open_diff = tv_calculate_rear_commands_from_rack(
+        &vehicle, true, 70, 5000U, pedal_midpoint, 0U);
+    assert(open_diff.status == TV_OK);
+    assert(!open_diff.torque_vectoring_active);
+    assert(open_diff.rear_left == pedal_midpoint);
+    assert(open_diff.rear_right == pedal_midpoint);
+
+    const WheelCommands half_gain = tv_calculate_rear_commands_from_rack(
+        &vehicle, true, 70, 5000U, pedal_midpoint, 50U);
+    assert(half_gain.status == TV_OK);
+    assert(half_gain.torque_vectoring_active);
+    assert(half_gain.rear_left == 100);
+    assert(half_gain.rear_right == 156);
+    assert(half_gain.rear_left + half_gain.rear_right == 2 * pedal_midpoint);
+
+    const WheelCommands clamped_gain = tv_calculate_rear_commands_from_rack(
+        &vehicle, true, 70, 5000U, pedal_midpoint, 500U);
+    assert(clamped_gain.status == TV_OK);
+    assert(clamped_gain.rear_left == left.rear_left);
+    assert(clamped_gain.rear_right == left.rear_right);
 
     assert(tv_com_velocity_from_rear_wheels_mmps(&vehicle, 5000U, 5000U) ==
            5000U);

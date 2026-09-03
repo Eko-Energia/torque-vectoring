@@ -36,7 +36,8 @@ static WheelCommands control_cycle(
     uint32_t rear_right_rpm,
     bool rack_position_available,
     int32_t rack_displacement_mm,
-    int32_t pedal_command)
+    int32_t pedal_command,
+    uint32_t tv_gain_percent)
 {
     const uint32_t front_left_mmps = tv_filter_wheel_speed_mmps(
         &filters->front_left,
@@ -63,7 +64,7 @@ static WheelCommands control_cycle(
 
     return tv_calculate_rear_commands_from_rack(
         vehicle, rack_position_available, rack_displacement_mm,
-        vehicle_speed_mmps, pedal_command);
+        vehicle_speed_mmps, pedal_command, tv_gain_percent);
 }
 
 int main(void)
@@ -75,7 +76,7 @@ int main(void)
     {
         WheelFilters filters = {0};
         const WheelCommands commands = control_cycle(
-            &vehicle, &filters, 273U, 273U, 273U, 273U, true, 0, 200);
+            &vehicle, &filters, 273U, 273U, 273U, 273U, true, 0, 200, 100U);
         assert(commands.status == TV_OK);
         assert(!commands.torque_vectoring_active);
         assert(commands.rear_left == 200);
@@ -89,7 +90,7 @@ int main(void)
     {
         WheelFilters filters = {0};
         const WheelCommands commands = control_cycle(
-            &vehicle, &filters, 216U, 223U, 215U, 222U, true, 10, 200);
+            &vehicle, &filters, 216U, 223U, 215U, 222U, true, 10, 200, 100U);
         assert(commands.status == TV_OK);
         assert(commands.torque_vectoring_active);
         assert(commands.turn_radius_mm == 50700U);
@@ -105,7 +106,7 @@ int main(void)
     {
         WheelFilters filters = {0};
         const WheelCommands commands = control_cycle(
-            &vehicle, &filters, 246U, 246U, 328U, 328U, true, 40, 180);
+            &vehicle, &filters, 246U, 246U, 328U, 328U, true, 40, 180, 100U);
         assert(commands.status == TV_OK);
         assert(commands.torque_vectoring_active);
         assert(commands.turn_radius_mm == 12675U);
@@ -119,7 +120,7 @@ int main(void)
        what keeps the car driving. */
     {
         const WheelCommands commands = tv_calculate_rear_commands_from_rack(
-            &vehicle, true, 40, 10519U, 180);
+            &vehicle, true, 40, 10519U, 180, 100U);
         assert(commands.status == TV_LATERAL_GRIP_EXCEEDED);
         assert(commands.rear_left == vehicle.command_min);
         assert(commands.rear_right == vehicle.command_min);
@@ -131,7 +132,7 @@ int main(void)
     {
         WheelFilters filters = {0};
         const WheelCommands commands = control_cycle(
-            &vehicle, &filters, 273U, 273U, 273U, 273U, true, 70, 200);
+            &vehicle, &filters, 273U, 273U, 273U, 273U, true, 70, 200, 100U);
         assert(commands.status == TV_LATERAL_GRIP_EXCEEDED);
         assert(commands.rear_left == vehicle.command_min);
         assert(commands.rear_right == vehicle.command_min);
@@ -143,7 +144,7 @@ int main(void)
     {
         WheelFilters filters = {0};
         const WheelCommands commands = control_cycle(
-            &vehicle, &filters, 216U, 223U, 215U, 222U, true, 10, 256);
+            &vehicle, &filters, 216U, 223U, 215U, 222U, true, 10, 256, 100U);
         assert(commands.status == TV_OK);
         assert(commands.rear_left == 185);
         assert(commands.rear_right == 256);
@@ -158,7 +159,7 @@ int main(void)
         for (unsigned i = 0U; i < 6U; i++) {
             const WheelCommands commands = control_cycle(
                 &vehicle, &filters, noisy_rpm[i], noisy_rpm[i],
-                noisy_rpm[i], noisy_rpm[i], true, 0, 120);
+                noisy_rpm[i], noisy_rpm[i], true, 0, 120, 100U);
             assert(commands.status == TV_OK);
             assert(commands.rear_left == 120);
             assert(commands.rear_right == 120);
@@ -171,7 +172,22 @@ int main(void)
     {
         WheelFilters filters = {0};
         const WheelCommands commands = control_cycle(
-            &vehicle, &filters, 216U, 223U, 215U, 222U, false, 10, 200);
+            &vehicle, &filters, 216U, 223U, 215U, 222U, false, 10, 200, 100U);
+        assert(commands.status == TV_OK);
+        assert(!commands.torque_vectoring_active);
+        assert(commands.rear_left == 200);
+        assert(commands.rear_right == 200);
+    }
+
+    /* Scenario: driver dials the same 50.7 m turn (rack +10 mm, 200 pedal)
+       down to 0% torque-vectoring gain. Even though the rack is turned and
+       the rear wheels are kinematically consistent with it, the driver has
+       chosen open-differential behaviour, so both motors get the pedal
+       verbatim, exactly like the rack-unavailable fallback above. */
+    {
+        WheelFilters filters = {0};
+        const WheelCommands commands = control_cycle(
+            &vehicle, &filters, 216U, 223U, 215U, 222U, true, 10, 200, 0U);
         assert(commands.status == TV_OK);
         assert(!commands.torque_vectoring_active);
         assert(commands.rear_left == 200);

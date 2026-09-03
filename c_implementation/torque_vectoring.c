@@ -112,6 +112,34 @@ static uint32_t hypot_rounded_u32(uint32_t a, uint32_t b)
     return isqrt_rounded_u64(sum);
 }
 
+/**
+ * @brief Blends a command offset toward the equal-split (pedal) offset.
+ * @param offset Calculated per-wheel offset from command_min.
+ * @param pedal_offset Equal-split offset, i.e. pedal_command - command_min.
+ * @param gain_percent Blend factor already clamped to [0, 100]; 0 returns
+ *        pedal_offset exactly, 100 returns offset unchanged.
+ * @return offset moved gain_percent of the way from pedal_offset, rounded to
+ *         the nearest integer.
+ *
+ * Implemented with an unsigned magnitude and an explicit direction so that no
+ * intermediate value can underflow, matching the rest of this file's
+ * unsigned-arithmetic style.
+ */
+static uint64_t blend_offset_towards_pedal(
+    uint64_t offset,
+    uint64_t pedal_offset,
+    uint32_t gain_percent)
+{
+    if (offset >= pedal_offset) {
+        const uint64_t delta = offset - pedal_offset;
+        return pedal_offset + divide_rounded_u64(delta * gain_percent, 100U);
+    }
+    const uint64_t delta = pedal_offset - offset;
+    /* gain_percent <= 100, so the rounded reduction never exceeds delta. */
+    const uint64_t reduction = divide_rounded_u64(delta * gain_percent, 100U);
+    return pedal_offset - reduction;
+}
+
 /** @brief Adds an unsigned offset and clamps it to the configured command range. */
 static int32_t command_from_offset(
     const VehicleParameters *vehicle,
@@ -320,8 +348,13 @@ WheelCommands tv_calculate_rear_commands_from_rack(
     bool rack_position_available,
     int32_t rack_displacement_mm,
     uint32_t vehicle_speed_mmps,
-    int32_t pedal_command)
+    int32_t pedal_command,
+    uint32_t tv_gain_percent)
 {
+    if (tv_gain_percent > 100U) {
+        tv_gain_percent = 100U;
+    }
+
     WheelCommands commands = {.status = TV_INVALID_ARGUMENT};
     if (!vehicle_is_valid(vehicle)) {
         return commands;
@@ -407,8 +440,12 @@ WheelCommands tv_calculate_rear_commands_from_rack(
             pedal_offset * 2U * outer_weight, total_proxy);
     }
 
-    const int32_t inner_command = command_from_offset(vehicle, inner_offset);
-    const int32_t outer_command = command_from_offset(vehicle, outer_offset);
+    const uint64_t blended_inner_offset =
+        blend_offset_towards_pedal(inner_offset, pedal_offset, tv_gain_percent);
+    const uint64_t blended_outer_offset =
+        blend_offset_towards_pedal(outer_offset, pedal_offset, tv_gain_percent);
+    const int32_t inner_command = command_from_offset(vehicle, blended_inner_offset);
+    const int32_t outer_command = command_from_offset(vehicle, blended_outer_offset);
     if (rack_displacement_mm > 0) {
         commands.rear_left = inner_command;
         commands.rear_right = outer_command;
@@ -416,7 +453,7 @@ WheelCommands tv_calculate_rear_commands_from_rack(
         commands.rear_left = outer_command;
         commands.rear_right = inner_command;
     }
-    commands.torque_vectoring_active = true;
+    commands.torque_vectoring_active = inner_command != outer_command;
     commands.status = TV_OK;
     return commands;
 }
